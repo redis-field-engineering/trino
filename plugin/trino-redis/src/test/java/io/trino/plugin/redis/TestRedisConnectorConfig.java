@@ -67,7 +67,7 @@ public class TestRedisConnectorConfig
                 .put("redis.database-index", "5")
                 .put("redis.user", "test")
                 .put("redis.password", "secret")
-                .put("redis.search", "false")
+                .put("redis.search", "true")
                 .buildOrThrow();
 
         RedisConnectorConfig expected = new RedisConnectorConfig()
@@ -84,7 +84,8 @@ public class TestRedisConnectorConfig
                 .setRedisUser("test")
                 .setRedisPassword("secret")
                 .setRedisKeyDelimiter(",")
-                .setKeyPrefixSchemaTable(true);
+                .setKeyPrefixSchemaTable(true)
+                .setSearch(true);
 
         assertFullMapping(properties, expected);
     }
