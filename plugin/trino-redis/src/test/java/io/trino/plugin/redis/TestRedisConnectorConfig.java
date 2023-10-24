@@ -45,7 +45,8 @@ public class TestRedisConnectorConfig
                 .setRedisPassword(null)
                 .setRedisScanCount(100)
                 .setRedisMaxKeysPerFetch(100)
-                .setHideInternalColumns(true));
+                .setHideInternalColumns(true)
+                .setSearch(false));
     }
 
     @Test
@@ -66,6 +67,7 @@ public class TestRedisConnectorConfig
                 .put("redis.database-index", "5")
                 .put("redis.user", "test")
                 .put("redis.password", "secret")
+                .put("redis.search", "false")
                 .buildOrThrow();
 
         RedisConnectorConfig expected = new RedisConnectorConfig()
