@@ -24,6 +24,7 @@ import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
 import io.trino.spi.connector.SchemaTableName;
+import io.trino.spi.type.TypeManager;
 
 import java.util.Map;
 import java.util.Optional;
@@ -55,6 +56,14 @@ public class RedisConnectorFactory
         requireNonNull(config, "config is null");
         checkStrictSpiVersionMatch(context, this);
 
+        if (Boolean.parseBoolean(config.getOrDefault("redis.search", "false").trim())) {
+            Bootstrap app = new Bootstrap(
+                    new JsonModule(),
+                    new RediSearchClientModule(),
+                    binder -> binder.bind(TypeManager.class).toInstance(context.getTypeManager()));
+            Injector injector = app.doNotInitializeLogging().setRequiredConfigurationProperties(config).initialize();
+            return injector.getInstance(RediSearchConnector.class);
+        }
         Bootstrap app = new Bootstrap(
                 new JsonModule(),
                 new TypeDeserializerModule(context.getTypeManager()),

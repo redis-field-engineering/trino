@@ -52,6 +52,7 @@ public class RedisConnectorConfig
     private Duration tableDescriptionCacheDuration = new Duration(5, MINUTES);
     private boolean hideInternalColumns = true;
     private boolean keyPrefixSchemaTable;
+    private boolean search;
 
     @NotNull
     public File getTableDescriptionDir()
@@ -242,6 +243,19 @@ public class RedisConnectorConfig
     public RedisConnectorConfig setKeyPrefixSchemaTable(boolean keyPrefixSchemaTable)
     {
         this.keyPrefixSchemaTable = keyPrefixSchemaTable;
+        return this;
+    }
+
+    public boolean isSearch()
+    {
+        return search;
+    }
+
+    @Config("redis.search")
+    @ConfigDescription("Whether to use advanced Redis search capabilities. Default is no")
+    public RedisConnectorConfig setSearch(boolean search)
+    {
+        this.search = search;
         return this;
     }
 
