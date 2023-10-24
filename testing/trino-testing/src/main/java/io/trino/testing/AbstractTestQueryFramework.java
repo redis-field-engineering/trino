@@ -50,6 +50,7 @@ import io.trino.sql.planner.plan.TableScanNode;
 import io.trino.sql.query.QueryAssertions.QueryAssert;
 import io.trino.sql.tree.ExplainType;
 import io.trino.testing.TestingAccessControlManager.TestingPrivilege;
+import io.trino.testng.services.ReportBadTestAnnotations;
 import io.trino.transaction.TransactionBuilder;
 import io.trino.util.AutoCloseableCloser;
 import org.assertj.core.api.AssertProvider;
@@ -57,10 +58,8 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 import java.util.List;
 import java.util.Map;
@@ -271,7 +270,8 @@ public abstract class AbstractTestQueryFramework
         }
     }
 
-    @Test
+    // TODO @Test - Temporarily disabled to avoid test classes running twice. Re-enable once all tests migrated to JUnit.
+    @ReportBadTestAnnotations.Suppress
     public void ensureTestNamingConvention()
     {
         // Enforce a naming convention to make code navigation easier.
@@ -292,7 +292,7 @@ public abstract class AbstractTestQueryFramework
 
     protected TransactionBuilder newTransaction()
     {
-        return transaction(queryRunner.getTransactionManager(), queryRunner.getAccessControl());
+        return transaction(queryRunner.getTransactionManager(), queryRunner.getMetadata(), queryRunner.getAccessControl());
     }
 
     protected void inTransaction(Consumer<Session> callback)
@@ -495,6 +495,15 @@ public abstract class AbstractTestQueryFramework
         assertException(session, sql, ".*Access Denied: " + exceptionsMessageRegExp, deniedPrivileges);
     }
 
+    protected void assertFunctionNotFound(
+            Session session,
+            @Language("SQL") String sql,
+            String functionName,
+            TestingPrivilege... deniedPrivileges)
+    {
+        assertException(session, sql, ".*[Ff]unction '" + functionName + "' not registered", deniedPrivileges);
+    }
+
     private void assertException(Session session, @Language("SQL") String sql, @Language("RegExp") String exceptionsMessageRegExp, TestingPrivilege[] deniedPrivileges)
     {
         assertThatThrownBy(() -> executeExclusively(session, sql, deniedPrivileges))
@@ -622,13 +631,6 @@ public abstract class AbstractTestQueryFramework
                 });
     }
 
-    protected static void skipTestUnless(boolean requirement)
-    {
-        if (!requirement) {
-            throw new SkipException("requirement not met");
-        }
-    }
-
     protected final QueryRunner getQueryRunner()
     {
         checkState(queryRunner != null, "queryRunner not set");
@@ -723,7 +725,7 @@ public abstract class AbstractTestQueryFramework
 
     private <T> T inTransaction(Session session, Function<Session, T> transactionSessionConsumer)
     {
-        return transaction(getQueryRunner().getTransactionManager(), getQueryRunner().getAccessControl())
+        return transaction(getQueryRunner().getTransactionManager(), getQueryRunner().getMetadata(), getQueryRunner().getAccessControl())
                 .singleStatement()
                 .execute(session, transactionSessionConsumer);
     }
