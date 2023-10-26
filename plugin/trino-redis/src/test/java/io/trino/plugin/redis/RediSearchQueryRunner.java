@@ -70,7 +70,7 @@ public final class RediSearchQueryRunner
 
             long startTime = System.nanoTime();
             for (TpchTable<?> table : tables) {
-                loadTpchTopic(server, trinoClient, table);
+                loadTpchTable(server, trinoClient, table);
             }
             LOG.info("Loading complete in %s s", Duration.ofNanos(System.nanoTime() - startTime).toSeconds());
             return queryRunner;
@@ -112,7 +112,7 @@ public final class RediSearchQueryRunner
         queryRunner.createCatalog("redis", "redis", config);
     }
 
-    private static void loadTpchTopic(RediSearchServer server, TestingTrinoClient trinoClient, TpchTable<?> table)
+    private static void loadTpchTable(RediSearchServer server, TestingTrinoClient trinoClient, TpchTable<?> table)
     {
         long start = System.nanoTime();
         LOG.info("Running import for %s", table.getTableName());

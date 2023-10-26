@@ -142,15 +142,15 @@ public class TestRediSearchConnectorSmokeTest
         getQueryRunner().execute("select id, message from " + JSON_INDEX);
     }
 
-    @Test
     @Override
+    @Test
     public void testHaving()
     {
         throw new SkipException("Not supported by RediSearch connector");
     }
 
-    @Test
     @Override
+    @Test
     public void testShowCreateTable()
     {
         throw new SkipException("Not supported by RediSearch connector");
