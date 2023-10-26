@@ -46,7 +46,11 @@ public class TestRedisConnectorConfig
                 .setRedisScanCount(100)
                 .setRedisMaxKeysPerFetch(100)
                 .setHideInternalColumns(true)
-                .setSearch(false));
+                .setSearch(false)
+                .setCaseInsensitiveNames(false)
+                .setDefaultSearchLimit(10000)
+                .setInsecure(false)
+                .setSearchCursorCount(1000));
     }
 
     @Test
@@ -68,6 +72,10 @@ public class TestRedisConnectorConfig
                 .put("redis.user", "test")
                 .put("redis.password", "secret")
                 .put("redis.search", "true")
+                .put("redis.case-insensitive-names", "true")
+                .put("redis.search-cursor-count", "100")
+                .put("redis.default-search-limit", "100")
+                .put("redis.insecure", "true")
                 .buildOrThrow();
 
         RedisConnectorConfig expected = new RedisConnectorConfig()
@@ -85,7 +93,11 @@ public class TestRedisConnectorConfig
                 .setRedisPassword("secret")
                 .setRedisKeyDelimiter(",")
                 .setKeyPrefixSchemaTable(true)
-                .setSearch(true);
+                .setSearch(true)
+                .setCaseInsensitiveNames(true)
+                .setSearchCursorCount(100)
+                .setDefaultSearchLimit(100)
+                .setInsecure(true);
 
         assertFullMapping(properties, expected);
     }
