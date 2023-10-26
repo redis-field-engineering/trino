@@ -27,7 +27,6 @@ import io.trino.sql.parser.ParsingException;
 import io.trino.testing.BaseConnectorSmokeTest;
 import io.trino.testing.QueryRunner;
 import io.trino.testing.TestingConnectorBehavior;
-import org.testng.SkipException;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -107,7 +106,6 @@ public class TestRediSearchConnectorSmokeTest
 
             case SUPPORTS_NEGATIVE_DATE:
                 return false;
-
             default:
                 return super.hasBehavior(connectorBehavior);
         }
@@ -140,18 +138,6 @@ public class TestRediSearchConnectorSmokeTest
             throws IOException
     {
         getQueryRunner().execute("select id, message from " + JSON_INDEX);
-    }
-
-    @Test @Override
-    public void testHaving()
-    {
-        throw new SkipException("Not supported by RediSearch connector");
-    }
-
-    @Test @Override
-    public void testShowCreateTable()
-    {
-        throw new SkipException("Not supported by RediSearch connector");
     }
 
     static RuntimeException getTrinoExceptionCause(Throwable e)
