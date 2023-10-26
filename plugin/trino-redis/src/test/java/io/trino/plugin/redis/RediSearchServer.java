@@ -16,10 +16,8 @@ package io.trino.plugin.redis;
 import com.google.common.net.HostAndPort;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
-import com.redis.lettucemod.cluster.RedisModulesClusterClient;
 import com.redis.lettucemod.util.RedisModulesUtils;
 import com.redis.testcontainers.RedisStackContainer;
-import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.RedisURI;
 
 import java.io.Closeable;
@@ -31,7 +29,7 @@ public class RediSearchServer
             RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG)).withEnv("REDISEARCH_ARGS",
                     "MAXAGGREGATERESULTS -1");
 
-    private final AbstractRedisClient client;
+    private final RedisModulesClient client;
 
     private final StatefulRedisModulesConnection<String, String> connection;
 
@@ -39,7 +37,7 @@ public class RediSearchServer
     {
         this.container.start();
         RedisURI uri = RedisURI.create(container.getRedisURI());
-        this.client = container.isCluster() ? RedisModulesClusterClient.create(uri) : RedisModulesClient.create(uri);
+        this.client = RedisModulesClient.create(uri);
         this.connection = RedisModulesUtils.connection(client);
     }
 
@@ -48,7 +46,7 @@ public class RediSearchServer
         return HostAndPort.fromParts(container.getHost(), container.getFirstMappedPort());
     }
 
-    public AbstractRedisClient getClient()
+    public RedisModulesClient getClient()
     {
         return client;
     }

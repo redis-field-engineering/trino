@@ -39,7 +39,7 @@ import static java.util.Objects.requireNonNull;
 public final class RediSearchQueryRunner
 {
     private static final Logger LOG = Logger.get(RediSearchQueryRunner.class);
-    private static final String TPCH_SCHEMA = "tpch";
+    public static final String TPCH = "tpch";
 
     private RediSearchQueryRunner()
     {
@@ -61,7 +61,7 @@ public final class RediSearchQueryRunner
             queryRunner = DistributedQueryRunner.builder(createSession()).setExtraProperties(extraProperties).build();
 
             queryRunner.installPlugin(new TpchPlugin());
-            queryRunner.createCatalog("tpch", "tpch");
+            queryRunner.createCatalog(TPCH, TPCH);
 
             installRediSearchPlugin(server, queryRunner, extraConnectorProperties);
 
@@ -111,8 +111,8 @@ public final class RediSearchQueryRunner
         connectorProperties = new HashMap<>(ImmutableMap.copyOf(connectorProperties));
         connectorProperties.putIfAbsent("redis.nodes", server.getHostAndPort().toString());
         connectorProperties.putIfAbsent("redis.default-search-limit", "100000");
-        connectorProperties.putIfAbsent("redis.default-schema", "default");
-        queryRunner.createCatalog("redis", "redis", connectorProperties);
+        connectorProperties.putIfAbsent("redis.default-schema", TPCH);
+        queryRunner.createCatalog(TPCH, TPCH, connectorProperties);
     }
 
     private static void loadTpchTable(RediSearchServer server, TestingTrinoClient trinoClient, TpchTable<?> table)
@@ -122,14 +122,14 @@ public final class RediSearchQueryRunner
         try (RediSearchLoader loader = new RediSearchLoader(server.getClient(),
                 table.getTableName().toLowerCase(ENGLISH), trinoClient.getServer(), trinoClient.getDefaultSession())) {
             loader.execute(format("SELECT * from %s",
-                    new QualifiedObjectName(TPCH_SCHEMA, TINY_SCHEMA_NAME, table.getTableName().toLowerCase(ENGLISH))));
+                    new QualifiedObjectName(TPCH, TINY_SCHEMA_NAME, table.getTableName().toLowerCase(ENGLISH))));
         }
         LOG.info("Imported %s in %s s", table.getTableName(), Duration.ofNanos(System.nanoTime() - start).toSeconds());
     }
 
     public static Session createSession()
     {
-        return testSessionBuilder().setCatalog("redis").setSchema(TPCH_SCHEMA).build();
+        return testSessionBuilder().setCatalog(TPCH).setSchema(TPCH).build();
     }
 
     public static void main(String[] args)
