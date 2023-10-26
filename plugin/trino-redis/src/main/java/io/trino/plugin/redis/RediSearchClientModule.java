@@ -33,12 +33,12 @@ public class RediSearchClientModule
         binder.bind(RediSearchSplitManager.class).in(Scopes.SINGLETON);
         binder.bind(RediSearchPageSourceProvider.class).in(Scopes.SINGLETON);
 
-        configBinder(binder).bindConfig(RediSearchConfig.class);
+        configBinder(binder).bindConfig(RedisConnectorConfig.class);
     }
 
     @Singleton
     @Provides
-    public static RediSearchSession createRediSearchSession(TypeManager typeManager, RediSearchConfig config)
+    public static RediSearchSession createRediSearchSession(TypeManager typeManager, RedisConnectorConfig config)
     {
         requireNonNull(config, "config is null");
         return new RediSearchSession(typeManager, config);

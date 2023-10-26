@@ -19,7 +19,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
-import com.redis.lettucemod.cluster.RedisModulesClusterClient;
 import com.redis.lettucemod.search.AggregateOperation;
 import com.redis.lettucemod.search.AggregateOptions;
 import com.redis.lettucemod.search.AggregateWithCursorResults;
@@ -33,12 +32,7 @@ import com.redis.lettucemod.search.SearchResults;
 import com.redis.lettucemod.util.RedisModulesUtils;
 import io.airlift.log.Logger;
 import io.lettuce.core.AbstractRedisClient;
-import io.lettuce.core.ClientOptions;
 import io.lettuce.core.RedisURI;
-import io.lettuce.core.SslOptions;
-import io.lettuce.core.SslOptions.Builder;
-import io.lettuce.core.cluster.ClusterClientOptions;
-import io.lettuce.core.protocol.ProtocolVersion;
 import io.trino.cache.EvictableCacheBuilder;
 import io.trino.plugin.redis.RediSearchTranslator.Aggregation;
 import io.trino.plugin.redis.RediSearchTranslator.Search;
@@ -66,8 +60,7 @@ import io.trino.spi.type.TypeSignature;
 import io.trino.spi.type.UuidType;
 import io.trino.spi.type.VarcharType;
 
-import java.io.File;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -94,7 +87,7 @@ public class RediSearchSession
 
     private final TypeManager typeManager;
 
-    private final RediSearchConfig config;
+    private final RedisConnectorConfig config;
 
     private final RediSearchTranslator translator;
 
@@ -104,7 +97,7 @@ public class RediSearchSession
 
     private final Cache<SchemaTableName, RediSearchTable> tableCache;
 
-    public RediSearchSession(TypeManager typeManager, RediSearchConfig config)
+    public RediSearchSession(TypeManager typeManager, RedisConnectorConfig config)
     {
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.config = requireNonNull(config, "config is null");
@@ -112,60 +105,25 @@ public class RediSearchSession
         this.client = client(config);
         this.connection = RedisModulesUtils.connection(client);
         this.tableCache = EvictableCacheBuilder.newBuilder()
-                .expireAfterWrite(config.getTableCacheRefresh(), TimeUnit.SECONDS).build();
+                .expireAfterWrite(config.getTableDescriptionCacheDuration().toMillis(), TimeUnit.MILLISECONDS).build();
     }
 
-    private AbstractRedisClient client(RediSearchConfig config)
+    private AbstractRedisClient client(RedisConnectorConfig config)
     {
         RedisURI redisURI = redisURI(config);
-        if (config.isCluster()) {
-            RedisModulesClusterClient clusterClient = RedisModulesClusterClient.create(redisURI);
-            clusterClient.setOptions(ClusterClientOptions.builder(clientOptions(config)).build());
-            return clusterClient;
-        }
-        RedisModulesClient redisClient = RedisModulesClient.create(redisURI);
-        redisClient.setOptions(clientOptions(config));
-        return redisClient;
+        return RedisModulesClient.create(redisURI);
     }
 
-    private ClientOptions clientOptions(RediSearchConfig config)
+    private RedisURI redisURI(RedisConnectorConfig config)
     {
-        ClientOptions.Builder builder = ClientOptions.builder();
-        builder.sslOptions(sslOptions(config));
-        builder.protocolVersion(protocolVersion(config));
-        return builder.build();
-    }
-
-    private ProtocolVersion protocolVersion(RediSearchConfig config)
-    {
-        if (config.isResp2()) {
-            return ProtocolVersion.RESP2;
-        }
-        return RedisModulesClient.DEFAULT_PROTOCOL_VERSION;
-    }
-
-    public SslOptions sslOptions(RediSearchConfig config)
-    {
-        Builder ssl = SslOptions.builder();
-        if (config.getKeyPath() != null) {
-            ssl.keyManager(new File(config.getCertPath()), new File(config.getKeyPath()),
-                    config.getKeyPassword().toCharArray());
-        }
-        if (config.getCaCertPath() != null) {
-            ssl.trustManager(new File(config.getCaCertPath()));
-        }
-        return ssl.build();
-    }
-
-    private RedisURI redisURI(RediSearchConfig config)
-    {
-        RedisURI.Builder uri = RedisURI.builder(RedisURI.create(config.getUri()));
-        if (config.getPassword() != null) {
-            if (config.getUsername() != null) {
-                uri.withAuthentication(config.getUsername(), config.getPassword());
+        HostAddress hostAddress = config.getNodes().iterator().next();
+        RedisURI.Builder uri = RedisURI.builder(RedisURI.create(hostAddress.getHostText(), hostAddress.getPort()));
+        if (hasLength(config.getRedisPassword())) {
+            if (hasLength(config.getRedisUser())) {
+                uri.withAuthentication(config.getRedisUser(), config.getRedisPassword());
             }
             else {
-                uri.withPassword(config.getPassword().toCharArray());
+                uri.withPassword(config.getRedisPassword().toCharArray());
             }
         }
         if (config.isInsecure()) {
@@ -174,12 +132,17 @@ public class RediSearchSession
         return uri.build();
     }
 
+    private static boolean hasLength(String string)
+    {
+        return string != null && !string.isEmpty();
+    }
+
     public StatefulRedisModulesConnection<String, String> getConnection()
     {
         return connection;
     }
 
-    public RediSearchConfig getConfig()
+    public RedisConnectorConfig getConfig()
     {
         return config;
     }
@@ -193,8 +156,7 @@ public class RediSearchSession
 
     public List<HostAddress> getAddresses()
     {
-        RedisURI redisURI = RedisURI.create(config.getUri());
-        return Collections.singletonList(HostAddress.fromParts(redisURI.getHost(), redisURI.getPort()));
+        return new ArrayList<>(config.getNodes());
     }
 
     private Set<String> listIndexNames()
@@ -393,8 +355,8 @@ public class RediSearchSession
     public AggregateWithCursorResults<String> cursorRead(RediSearchTableHandle tableHandle, long cursor)
     {
         String index = tableHandle.getIndex();
-        if (config.getCursorCount() > 0) {
-            return connection.sync().ftCursorRead(index, cursor, config.getCursorCount());
+        if (config.getSearchCursorCount() > 0) {
+            return connection.sync().ftCursorRead(index, cursor, config.getSearchCursorCount());
         }
         return connection.sync().ftCursorRead(index, cursor);
     }

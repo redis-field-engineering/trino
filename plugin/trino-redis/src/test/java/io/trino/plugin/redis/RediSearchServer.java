@@ -13,6 +13,7 @@
  */
 package io.trino.plugin.redis;
 
+import com.google.common.net.HostAndPort;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.cluster.RedisModulesClusterClient;
@@ -42,9 +43,9 @@ public class RediSearchServer
         this.connection = RedisModulesUtils.connection(client);
     }
 
-    public String getRedisURI()
+    public HostAndPort getHostAndPort()
     {
-        return container.getRedisURI();
+        return HostAndPort.fromParts(container.getHost(), container.getFirstMappedPort());
     }
 
     public AbstractRedisClient getClient()

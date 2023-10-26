@@ -25,14 +25,14 @@ public class RediSearchTranslator
 {
     private final RediSearchQueryBuilder queryBuilder = new RediSearchQueryBuilder();
 
-    private final RediSearchConfig config;
+    private final RedisConnectorConfig config;
 
-    public RediSearchTranslator(RediSearchConfig config)
+    public RediSearchTranslator(RedisConnectorConfig config)
     {
         this.config = requireNonNull(config, "config is null");
     }
 
-    public RediSearchConfig getConfig()
+    public RedisConnectorConfig getConfig()
     {
         return config;
     }
@@ -252,8 +252,8 @@ public class RediSearchTranslator
         builder.operation(Limit.offset(0).num(limit(table)));
         AggregateOptions<String, String> options = builder.build();
         CursorOptions.Builder cursorOptions = CursorOptions.builder();
-        if (config.getCursorCount() > 0) {
-            cursorOptions.count(config.getCursorCount());
+        if (config.getSearchCursorCount() > 0) {
+            cursorOptions.count(config.getSearchCursorCount());
         }
         return Aggregation.builder().index(index).query(query).options(options).cursorOptions(cursorOptions.build())
                 .build();
@@ -264,6 +264,6 @@ public class RediSearchTranslator
         if (tableHandle.getLimit().isPresent()) {
             return tableHandle.getLimit().getAsLong();
         }
-        return config.getDefaultLimit();
+        return config.getDefaultSearchLimit();
     }
 }

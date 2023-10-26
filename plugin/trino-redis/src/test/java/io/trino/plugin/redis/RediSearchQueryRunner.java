@@ -106,10 +106,10 @@ public final class RediSearchQueryRunner
     private static void installRediSearchPlugin(RediSearchServer server, QueryRunner queryRunner, Map<String, String> extraConnectorProperties)
     {
         queryRunner.installPlugin(new RedisPlugin());
-        Map<String, String> config = ImmutableMap.<String, String>builder().put("redisearch.uri", server.getRedisURI())
-                .put("redisearch.default-limit", "100000").put("redisearch.default-schema-name", TPCH_SCHEMA)
+        Map<String, String> config = ImmutableMap.<String, String>builder().put("redis.nodes", server.getHostAndPort().toString())
+                .put("redis.default-search-limit", "100000").put("redis.default-schema", TPCH_SCHEMA)
                 .putAll(extraConnectorProperties).buildOrThrow();
-        queryRunner.createCatalog("redisearch", "redisearch", config);
+        queryRunner.createCatalog("redis", "redis", config);
     }
 
     private static void loadTpchTopic(RediSearchServer server, TestingTrinoClient trinoClient, TpchTable<?> table)
@@ -126,7 +126,7 @@ public final class RediSearchQueryRunner
 
     public static Session createSession()
     {
-        return testSessionBuilder().setCatalog("redisearch").setSchema(TPCH_SCHEMA).build();
+        return testSessionBuilder().setCatalog("redis").setSchema(TPCH_SCHEMA).build();
     }
 
     public static void main(String[] args)
