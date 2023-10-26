@@ -143,11 +143,13 @@ public class TestRediSearchConnectorSmokeTest
     }
 
     @Test
+    @Override
     public void testHaving()
     {
         throw new SkipException("Not supported by RediSearch connector");
     }
 
+    @Test
     @Override
     public void testShowCreateTable()
     {
