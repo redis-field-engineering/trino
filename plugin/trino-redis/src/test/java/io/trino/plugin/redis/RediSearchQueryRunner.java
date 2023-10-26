@@ -27,6 +27,7 @@ import io.trino.testing.TestingTrinoClient;
 import io.trino.tpch.TpchTable;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 
 import static io.trino.plugin.tpch.TpchMetadata.TINY_SCHEMA_NAME;
@@ -103,13 +104,15 @@ public final class RediSearchQueryRunner
         return rootCause;
     }
 
-    private static void installRediSearchPlugin(RediSearchServer server, QueryRunner queryRunner, Map<String, String> extraConnectorProperties)
+    private static void installRediSearchPlugin(RediSearchServer server, QueryRunner queryRunner, Map<String, String> connectorProperties)
     {
         queryRunner.installPlugin(new RedisPlugin());
-        Map<String, String> config = ImmutableMap.<String, String>builder().put("redis.nodes", server.getHostAndPort().toString())
-                .put("redis.default-search-limit", "100000").put("redis.default-schema", TPCH_SCHEMA)
-                .putAll(extraConnectorProperties).buildOrThrow();
-        queryRunner.createCatalog("redis", "redis", config);
+        // note: additional copy via ImmutableList so that if fails on nulls
+        connectorProperties = new HashMap<>(ImmutableMap.copyOf(connectorProperties));
+        connectorProperties.putIfAbsent("redis.nodes", server.getHostAndPort().toString());
+        connectorProperties.putIfAbsent("redis.default-search-limit", "100000");
+        connectorProperties.putIfAbsent("redis.default-schema", "default");
+        queryRunner.createCatalog("redis", "redis", connectorProperties);
     }
 
     private static void loadTpchTable(RediSearchServer server, TestingTrinoClient trinoClient, TpchTable<?> table)
