@@ -182,6 +182,13 @@
         </dependency>
 
         <dependency>
+            <groupId>com.redis</groupId>
+            <artifactId>spring-batch-redis</artifactId>
+            <version>3.7.5</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
             <groupId>com.redis.testcontainers</groupId>
             <artifactId>testcontainers-redis</artifactId>
             <version>1.6.4</version>
