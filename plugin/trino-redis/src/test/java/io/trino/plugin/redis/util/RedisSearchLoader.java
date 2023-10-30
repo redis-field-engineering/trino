@@ -13,6 +13,10 @@
  */
 package io.trino.plugin.redis.util;
 
+import com.redis.lettucemod.api.StatefulRedisModulesConnection;
+import com.redis.lettucemod.search.CreateOptions;
+import com.redis.lettucemod.search.Field;
+import com.redis.lettucemod.util.RedisModulesUtils;
 import com.redis.spring.batch.writer.OperationItemWriter;
 import com.redis.spring.batch.writer.operation.Hset;
 import io.lettuce.core.AbstractRedisClient;
@@ -23,10 +27,12 @@ import io.trino.client.QueryData;
 import io.trino.client.QueryStatusInfo;
 import io.trino.server.testing.TestingTrinoServer;
 import io.trino.spi.type.Type;
+import io.trino.spi.type.VarcharType;
 import io.trino.testing.AbstractTestingTrinoClient;
 import io.trino.testing.ResultsSession;
 import org.springframework.batch.item.ExecutionContext;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +43,11 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import static com.google.common.base.Preconditions.checkState;
+import static io.trino.spi.type.BigintType.BIGINT;
+import static io.trino.spi.type.BooleanType.BOOLEAN;
+import static io.trino.spi.type.DateType.DATE;
+import static io.trino.spi.type.DoubleType.DOUBLE;
+import static io.trino.spi.type.IntegerType.INTEGER;
 import static java.util.Objects.requireNonNull;
 
 public class RedisSearchLoader
@@ -97,10 +108,36 @@ public class RedisSearchLoader
             }
             if (data.getData() != null) {
                 checkState(types.get() != null, "Data without types received!");
+                List<Column> columns = statusInfo.getColumns();
+                StatefulRedisModulesConnection<String, String> connection = RedisModulesUtils.connection(client);
+                if (!connection.sync().ftList().contains(tableName)) {
+                    List<Field<String>> schema = new ArrayList<>();
+                    for (int i = 0; i < columns.size(); i++) {
+                        Type type = types.get().get(i);
+                        schema.add(field(columns.get(i).getName(), type));
+                    }
+                    connection.sync().ftCreate(tableName,
+                            CreateOptions.<String, String>builder().prefix(tableName + ":").build(),
+                            schema.toArray(Field[]::new));
+                }
                 List<WriteItem> fieldsList = StreamSupport.stream(data.getData().spliterator(), false)
                         .map(f -> new WriteItem(statusInfo, f)).collect(Collectors.toList());
                 writer.write(fieldsList);
             }
+        }
+
+        private Field<String> field(String name, Type type)
+        {
+            if (type instanceof VarcharType) {
+                return Field.tag(name).build();
+            }
+            if (type == BOOLEAN || type == DATE) {
+                return Field.tag(name).build();
+            }
+            if (type == BIGINT || type == INTEGER || type == DOUBLE) {
+                return Field.numeric(name).build();
+            }
+            throw new IllegalArgumentException("Unhandled type: " + type);
         }
 
         private Map<String, String> map(List<Column> columns, List<Object> fields)
