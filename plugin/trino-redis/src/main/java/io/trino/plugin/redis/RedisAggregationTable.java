@@ -14,36 +14,35 @@
 package io.trino.plugin.redis;
 
 import com.google.common.collect.ImmutableList;
-import com.redis.lettucemod.search.IndexInfo;
 
 import java.util.List;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
-public class RediSearchTable
+public class RedisAggregationTable
 {
-    private final RediSearchTableHandle tableHandle;
-    private final List<RediSearchColumnHandle> columns;
-    private final IndexInfo indexInfo;
+    private final RedisAggregationTableHandle tableHandle;
+    private final List<RedisAggregationColumnHandle> columns;
+    private final RedisAggregationIndexInfo indexInfo;
 
-    public RediSearchTable(RediSearchTableHandle tableHandle, List<RediSearchColumnHandle> columns, IndexInfo indexInfo)
+    public RedisAggregationTable(RedisAggregationTableHandle tableHandle, List<RedisAggregationColumnHandle> columns, RedisAggregationIndexInfo indexInfo)
     {
         this.tableHandle = tableHandle;
         this.columns = ImmutableList.copyOf(columns);
         this.indexInfo = indexInfo;
     }
 
-    public IndexInfo getIndexInfo()
+    public RedisAggregationIndexInfo getIndexInfo()
     {
         return indexInfo;
     }
 
-    public RediSearchTableHandle getTableHandle()
+    public RedisAggregationTableHandle getTableHandle()
     {
         return tableHandle;
     }
 
-    public List<RediSearchColumnHandle> getColumns()
+    public List<RedisAggregationColumnHandle> getColumns()
     {
         return columns;
     }
@@ -60,10 +59,10 @@ public class RediSearchTable
         if (this == obj) {
             return true;
         }
-        if (!(obj instanceof RediSearchTable)) {
+        if (!(obj instanceof RedisAggregationTable)) {
             return false;
         }
-        RediSearchTable that = (RediSearchTable) obj;
+        RedisAggregationTable that = (RedisAggregationTable) obj;
         return this.tableHandle.equals(that.tableHandle);
     }
 

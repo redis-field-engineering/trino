@@ -21,14 +21,14 @@ import io.trino.spi.type.Type;
 import java.util.Objects;
 import java.util.Optional;
 
-public class RediSearchAggregationTerm
+public class RedisAggregationTerm
 {
     private final String term;
 
     private final Type type;
 
     @JsonCreator
-    public RediSearchAggregationTerm(@JsonProperty("term") String term, @JsonProperty("type") Type type)
+    public RedisAggregationTerm(@JsonProperty("term") String term, @JsonProperty("type") Type type)
     {
         this.term = term;
         this.type = type;
@@ -46,10 +46,10 @@ public class RediSearchAggregationTerm
         return type;
     }
 
-    public static Optional<RediSearchAggregationTerm> fromColumnHandle(ColumnHandle columnHandle)
+    public static Optional<RedisAggregationTerm> fromColumnHandle(ColumnHandle columnHandle)
     {
-        RediSearchColumnHandle column = (RediSearchColumnHandle) columnHandle;
-        return Optional.of(new RediSearchAggregationTerm(column.getName(), column.getType()));
+        RedisAggregationColumnHandle column = (RedisAggregationColumnHandle) columnHandle;
+        return Optional.of(new RedisAggregationTerm(column.getName(), column.getType()));
     }
 
     @Override
@@ -61,7 +61,7 @@ public class RediSearchAggregationTerm
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        RediSearchAggregationTerm that = (RediSearchAggregationTerm) o;
+        RedisAggregationTerm that = (RedisAggregationTerm) o;
         return Objects.equals(term, that.term) && Objects.equals(type, that.type);
     }
 

@@ -13,7 +13,6 @@
  */
 package io.trino.plugin.redis;
 
-import com.redis.lettucemod.search.AggregateWithCursorResults;
 import io.airlift.log.Logger;
 import io.trino.spi.Page;
 import io.trino.spi.PageBuilder;
@@ -28,15 +27,15 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Verify.verify;
 
-public class RediSearchPageSource
+public class RedisAggregationPageSource
         implements ConnectorPageSource
 {
-    private static final Logger log = Logger.get(RediSearchPageSource.class);
+    private static final Logger log = Logger.get(RedisAggregationPageSource.class);
 
     private static final int ROWS_PER_REQUEST = 1024;
 
-    private final RediSearchPageSourceResultWriter writer = new RediSearchPageSourceResultWriter();
-    private final String[] columnNames;
+    private final RedisAggregationPageSourceResultWriter writer = new RedisAggregationPageSourceResultWriter();
+    private final List<String> columnNames;
     private final List<Type> columnTypes;
     private final CursorIterator iterator;
     private Map<String, Object> currentDoc;
@@ -45,12 +44,12 @@ public class RediSearchPageSource
 
     private final PageBuilder pageBuilder;
 
-    public RediSearchPageSource(RediSearchSession session, RediSearchTableHandle table,
-            List<RediSearchColumnHandle> columns)
+    public RedisAggregationPageSource(RedisAggregationSession session, RedisAggregationTableHandle table,
+            List<RedisAggregationColumnHandle> columns)
     {
-        this.columnNames = columns.stream().map(RediSearchColumnHandle::getName).toArray(String[]::new);
+        this.columnNames = columns.stream().map(RedisAggregationColumnHandle::getName).toList();
         this.iterator = new CursorIterator(session, table, columnNames);
-        this.columnTypes = columns.stream().map(RediSearchColumnHandle::getType).collect(Collectors.toList());
+        this.columnTypes = columns.stream().map(RedisAggregationColumnHandle::getType).collect(Collectors.toList());
         this.currentDoc = null;
         this.pageBuilder = new PageBuilder(columnTypes);
     }
@@ -95,7 +94,7 @@ public class RediSearchPageSource
             pageBuilder.declarePosition();
             for (int column = 0; column < columnTypes.size(); column++) {
                 BlockBuilder output = pageBuilder.getBlockBuilder(column);
-                Object value = currentValue(columnNames[column]);
+                Object value = currentValue(columnNames.get(column));
                 if (value == null) {
                     output.appendNull();
                 }
@@ -111,8 +110,8 @@ public class RediSearchPageSource
 
     private Object currentValue(String columnName)
     {
-        if (RediSearchBuiltinField.isKeyColumn(columnName)) {
-            return currentDoc.get(RediSearchBuiltinField.KEY.getName());
+        if (RedisAggregationBuiltinField.isKeyColumn(columnName)) {
+            return currentDoc.get(RedisAggregationBuiltinField.KEY.getName());
         }
         return currentDoc.get(columnName);
     }
@@ -131,22 +130,22 @@ public class RediSearchPageSource
     private static class CursorIterator
             implements Iterator<Map<String, Object>>, AutoCloseable
     {
-        private final RediSearchSession session;
-        private final RediSearchTableHandle table;
+        private final RedisAggregationSession session;
+        private final RedisAggregationTableHandle table;
         private Iterator<Map<String, Object>> iterator;
-        private long cursor;
+        private Long cursor;
 
-        public CursorIterator(RediSearchSession session, RediSearchTableHandle table, String[] columnNames)
+        public CursorIterator(RedisAggregationSession session, RedisAggregationTableHandle table, List<String> columnNames)
         {
             this.session = session;
             this.table = table;
             read(session.aggregate(table, columnNames));
         }
 
-        private void read(AggregateWithCursorResults<String> results)
+        private void read(RedisAggregationResult results)
         {
-            this.iterator = results.iterator();
-            this.cursor = results.getCursor();
+            this.iterator = results.getResults().iterator();
+            this.cursor = results.getCursorId();
         }
 
         @Override

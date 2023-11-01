@@ -15,28 +15,28 @@ package io.trino.plugin.redis;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.redis.lettucemod.search.Field;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.type.Type;
+import redis.clients.jedis.search.Schema.FieldType;
 
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
-public class RediSearchColumnHandle
+public class RedisAggregationColumnHandle
         implements ColumnHandle
 {
     private final String name;
     private final Type type;
-    private final Field.Type fieldType;
+    private final FieldType fieldType;
     private final boolean hidden;
     private final boolean supportsPredicates;
 
     @JsonCreator
-    public RediSearchColumnHandle(@JsonProperty("name") String name, @JsonProperty("columnType") Type type,
-            @JsonProperty("fieldType") Field.Type fieldType, @JsonProperty("hidden") boolean hidden,
+    public RedisAggregationColumnHandle(@JsonProperty("name") String name, @JsonProperty("columnType") Type type,
+            @JsonProperty("fieldType") FieldType fieldType, @JsonProperty("hidden") boolean hidden,
             @JsonProperty("supportsPredicates") boolean supportsPredicates)
     {
         this.name = requireNonNull(name, "name is null");
@@ -59,7 +59,7 @@ public class RediSearchColumnHandle
     }
 
     @JsonProperty("fieldType")
-    public Field.Type getFieldType()
+    public FieldType getFieldType()
     {
         return fieldType;
     }
@@ -96,7 +96,7 @@ public class RediSearchColumnHandle
         if (obj == null || getClass() != obj.getClass()) {
             return false;
         }
-        RediSearchColumnHandle other = (RediSearchColumnHandle) obj;
+        RedisAggregationColumnHandle other = (RedisAggregationColumnHandle) obj;
         return Objects.equals(name, other.name) && Objects.equals(type, other.type) && this.fieldType == other.fieldType
                 && this.hidden == other.hidden && this.supportsPredicates == other.supportsPredicates;
     }

@@ -35,7 +35,6 @@ public class RedisConnector
 {
     private final LifeCycleManager lifeCycleManager;
     private final RedisMetadata metadata;
-
     private final RedisSplitManager splitManager;
     private final RedisRecordSetProvider recordSetProvider;
 

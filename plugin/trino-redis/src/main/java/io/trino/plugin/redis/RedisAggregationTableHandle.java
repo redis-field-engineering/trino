@@ -25,12 +25,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.OptionalLong;
+import java.util.OptionalInt;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
-public class RediSearchTableHandle
+public class RedisAggregationTableHandle
         implements ConnectorTableHandle
 {
     public enum Type
@@ -41,28 +41,28 @@ public class RediSearchTableHandle
     private final SchemaTableName schemaTableName;
     private final String index;
     private final TupleDomain<ColumnHandle> constraint;
-    private final OptionalLong limit;
+    private final OptionalInt limit;
     // for group by fields
-    private final List<RediSearchAggregationTerm> aggregationTerms;
-    private final List<RediSearchAggregation> aggregations;
+    private final List<RedisAggregationTerm> aggregationTerms;
+    private final List<RedisAggregation> aggregations;
     private final Map<String, String> wildcards;
     // UPDATE only
-    private final List<RediSearchColumnHandle> updatedColumns;
+    private final List<RedisAggregationColumnHandle> updatedColumns;
 
-    public RediSearchTableHandle(SchemaTableName schemaTableName, String index)
+    public RedisAggregationTableHandle(SchemaTableName schemaTableName, String index)
     {
-        this(schemaTableName, index, TupleDomain.all(), OptionalLong.empty(), Collections.emptyList(),
+        this(schemaTableName, index, TupleDomain.all(), OptionalInt.empty(), Collections.emptyList(),
                 Collections.emptyList(), Map.of(), Collections.emptyList());
     }
 
     @JsonCreator
-    public RediSearchTableHandle(@JsonProperty("schemaTableName") SchemaTableName schemaTableName,
+    public RedisAggregationTableHandle(@JsonProperty("schemaTableName") SchemaTableName schemaTableName,
             @JsonProperty("index") String index, @JsonProperty("constraint") TupleDomain<ColumnHandle> constraint,
-            @JsonProperty("limit") OptionalLong limit,
-            @JsonProperty("aggTerms") List<RediSearchAggregationTerm> termAggregations,
-            @JsonProperty("aggregates") List<RediSearchAggregation> metricAggregations,
+            @JsonProperty("limit") OptionalInt limit,
+            @JsonProperty("aggTerms") List<RedisAggregationTerm> termAggregations,
+            @JsonProperty("aggregates") List<RedisAggregation> metricAggregations,
             @JsonProperty("wildcards") Map<String, String> wildcards,
-            @JsonProperty("updatedColumns") List<RediSearchColumnHandle> updatedColumns)
+            @JsonProperty("updatedColumns") List<RedisAggregationColumnHandle> updatedColumns)
     {
         this.schemaTableName = requireNonNull(schemaTableName, "schemaTableName is null");
         this.index = requireNonNull(index, "index is null");
@@ -93,19 +93,19 @@ public class RediSearchTableHandle
     }
 
     @JsonProperty
-    public OptionalLong getLimit()
+    public OptionalInt getLimit()
     {
         return limit;
     }
 
     @JsonProperty
-    public List<RediSearchAggregationTerm> getTermAggregations()
+    public List<RedisAggregationTerm> getTermAggregations()
     {
         return aggregationTerms;
     }
 
     @JsonProperty
-    public List<RediSearchAggregation> getMetricAggregations()
+    public List<RedisAggregation> getMetricAggregations()
     {
         return aggregations;
     }
@@ -117,7 +117,7 @@ public class RediSearchTableHandle
     }
 
     @JsonProperty
-    public List<RediSearchColumnHandle> getUpdatedColumns()
+    public List<RedisAggregationColumnHandle> getUpdatedColumns()
     {
         return updatedColumns;
     }
@@ -137,7 +137,7 @@ public class RediSearchTableHandle
         if (obj == null || getClass() != obj.getClass()) {
             return false;
         }
-        RediSearchTableHandle other = (RediSearchTableHandle) obj;
+        RedisAggregationTableHandle other = (RedisAggregationTableHandle) obj;
         return Objects.equals(this.schemaTableName, other.schemaTableName) && Objects.equals(this.index, other.index)
                 && Objects.equals(this.constraint, other.constraint) && Objects.equals(this.limit, other.limit)
                 && Objects.equals(updatedColumns, other.updatedColumns);

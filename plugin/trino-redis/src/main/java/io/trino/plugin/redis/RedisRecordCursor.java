@@ -31,8 +31,7 @@ import io.trino.spi.predicate.TupleDomain;
 import io.trino.spi.predicate.ValueSet;
 import io.trino.spi.type.Type;
 import jakarta.annotation.Nullable;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.params.ScanParams;
@@ -68,7 +67,7 @@ public class RedisRecordCursor
 
     private final RedisSplit split;
     private final List<RedisColumnHandle> columnHandles;
-    private final JedisPool jedisPool;
+    private final JedisPooled jedis;
     private final ScanParams scanParams;
     private final int maxKeysPerFetch;
     private final char redisKeyDelimiter;
@@ -99,7 +98,7 @@ public class RedisRecordCursor
         this.valueDecoder = valueDecoder;
         this.split = split;
         this.columnHandles = columnHandles;
-        this.jedisPool = redisJedisManager.getJedisPool(split.getNodes().get(0));
+        this.jedis = redisJedisManager.getJedisPool(split.getNodes().get(0));
         this.redisKeyDelimiter = redisJedisManager.getRedisKeyDelimiter();
         this.isKeyPrefixSchemaTable = redisJedisManager.isKeyPrefixSchemaTable();
         this.redisScanCount = redisJedisManager.getRedisScanCount();
@@ -205,7 +204,7 @@ public class RedisRecordCursor
         }
     }
 
-    private void processHashValues(List<String> currentKeys)
+    @SuppressWarnings("unchecked") private void processHashValues(List<String> currentKeys)
     {
         for (int i = 0; i < currentKeys.size(); i++) {
             String keyString = currentKeys.get(i);
@@ -404,26 +403,24 @@ public class RedisRecordCursor
     // Otherwise they need to be found by scanning Redis
     private void fetchKeys()
     {
-        try (Jedis jedis = jedisPool.getResource()) {
-            switch (split.getKeyDataType()) {
-                case STRING: {
-                    String cursor = SCAN_POINTER_START;
-                    if (redisCursor != null) {
-                        cursor = redisCursor.getCursor();
-                    }
-
-                    log.debug("Scanning new Redis keys from cursor %s . %d values read so far", cursor, totalValues);
-
-                    redisCursor = jedis.scan(cursor, scanParams);
-                    keys = redisCursor.getResult();
+        switch (split.getKeyDataType()) {
+            case STRING: {
+                String cursor = SCAN_POINTER_START;
+                if (redisCursor != null) {
+                    cursor = redisCursor.getCursor();
                 }
-                break;
-                case ZSET:
-                    keys = jedis.zrange(split.getKeyName(), split.getStart(), split.getEnd());
-                    break;
-                default:
-                    log.warn("Redis key of type %s is unsupported", split.getKeyDataFormat());
+
+                log.debug("Scanning new Redis keys from cursor %s . %d values read so far", cursor, totalValues);
+
+                redisCursor = jedis.scan(cursor, scanParams);
+                keys = redisCursor.getResult();
             }
+            break;
+            case ZSET:
+                keys = jedis.zrange(split.getKeyName(), split.getStart(), split.getEnd());
+                break;
+            default:
+                log.warn("Redis key of type %s is unsupported", split.getKeyDataFormat());
         }
     }
 
@@ -431,21 +428,19 @@ public class RedisRecordCursor
     {
         stringValues = null;
         hashValues = null;
-        try (Jedis jedis = jedisPool.getResource()) {
-            switch (split.getValueDataType()) {
-                case STRING:
-                    stringValues = jedis.mget(currentKeys.toArray(new String[0]));
-                    break;
-                case HASH:
-                    Pipeline pipeline = jedis.pipelined();
-                    for (String key : currentKeys) {
-                        pipeline.hgetAll(key);
-                    }
-                    hashValues = pipeline.syncAndReturnAll();
-                    break;
-                default:
-                    log.warn("Redis value of type %s is unsupported", split.getValueDataType());
-            }
+        switch (split.getValueDataType()) {
+            case STRING:
+                stringValues = jedis.mget(currentKeys.toArray(new String[0]));
+                break;
+            case HASH:
+                Pipeline pipeline = jedis.pipelined();
+                for (String key : currentKeys) {
+                    pipeline.hgetAll(key);
+                }
+                hashValues = pipeline.syncAndReturnAll();
+                break;
+            default:
+                log.warn("Redis value of type %s is unsupported", split.getValueDataType());
         }
     }
 }

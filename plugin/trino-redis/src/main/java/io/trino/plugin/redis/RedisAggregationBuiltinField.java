@@ -13,9 +13,9 @@
  */
 package io.trino.plugin.redis;
 
-import com.redis.lettucemod.search.Field;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.type.Type;
+import redis.clients.jedis.search.Schema.FieldType;
 
 import java.util.Map;
 import java.util.Optional;
@@ -25,25 +25,25 @@ import static io.trino.spi.type.VarcharType.VARCHAR;
 import static java.util.Arrays.stream;
 import static java.util.function.Function.identity;
 
-enum RediSearchBuiltinField
+enum RedisAggregationBuiltinField
 {
-    KEY("__key", VARCHAR, Field.Type.TAG);
+    KEY("__key", VARCHAR, FieldType.TAG);
 
-    private static final Map<String, RediSearchBuiltinField> COLUMNS_BY_NAME = stream(values())
-            .collect(toImmutableMap(RediSearchBuiltinField::getName, identity()));
+    private static final Map<String, RedisAggregationBuiltinField> COLUMNS_BY_NAME = stream(values())
+            .collect(toImmutableMap(RedisAggregationBuiltinField::getName, identity()));
 
     private final String name;
     private final Type type;
-    private final Field.Type fieldType;
+    private final FieldType fieldType;
 
-    RediSearchBuiltinField(String name, Type type, Field.Type fieldType)
+    RedisAggregationBuiltinField(String name, Type type, FieldType fieldType)
     {
         this.name = name;
         this.type = type;
         this.fieldType = fieldType;
     }
 
-    public static Optional<RediSearchBuiltinField> of(String name)
+    public static Optional<RedisAggregationBuiltinField> of(String name)
     {
         return Optional.ofNullable(COLUMNS_BY_NAME.get(name));
     }
@@ -63,7 +63,7 @@ enum RediSearchBuiltinField
         return type;
     }
 
-    public Field.Type getFieldType()
+    public FieldType getFieldType()
     {
         return fieldType;
     }
@@ -73,9 +73,9 @@ enum RediSearchBuiltinField
         return ColumnMetadata.builder().setName(name).setType(type).setHidden(true).build();
     }
 
-    public RediSearchColumnHandle getColumnHandle()
+    public RedisAggregationColumnHandle getColumnHandle()
     {
-        return new RediSearchColumnHandle(name, type, fieldType, true, false);
+        return new RedisAggregationColumnHandle(name, type, fieldType, true, false);
     }
 
     public static boolean isKeyColumn(String columnName)

@@ -17,22 +17,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.primitives.Primitives;
 import com.google.common.primitives.Shorts;
 import com.google.common.primitives.SignedBytes;
-import com.redis.lettucemod.search.Field;
-import com.redis.lettucemod.search.Group;
-import com.redis.lettucemod.search.Reducer;
-import com.redis.lettucemod.search.Reducers.Avg;
-import com.redis.lettucemod.search.Reducers.Count;
-import com.redis.lettucemod.search.Reducers.Max;
-import com.redis.lettucemod.search.Reducers.Min;
-import com.redis.lettucemod.search.Reducers.Sum;
-import com.redis.lettucemod.search.querybuilder.Node;
-import com.redis.lettucemod.search.querybuilder.QueryBuilder;
-import com.redis.lettucemod.search.querybuilder.QueryNode;
-import com.redis.lettucemod.search.querybuilder.Value;
-import com.redis.lettucemod.search.querybuilder.Values;
-import com.redis.lettucemod.util.RedisModulesUtils;
-import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
+import io.trino.plugin.redis.RedisAggregationOptions.Reducer;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.predicate.Domain;
 import io.trino.spi.predicate.Range;
@@ -40,6 +26,12 @@ import io.trino.spi.predicate.TupleDomain;
 import io.trino.spi.type.IntegerType;
 import io.trino.spi.type.Type;
 import io.trino.spi.type.VarcharType;
+import redis.clients.jedis.search.Schema.FieldType;
+import redis.clients.jedis.search.querybuilder.Node;
+import redis.clients.jedis.search.querybuilder.QueryBuilders;
+import redis.clients.jedis.search.querybuilder.QueryNode;
+import redis.clients.jedis.search.querybuilder.Value;
+import redis.clients.jedis.search.querybuilder.Values;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -48,7 +40,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -59,17 +50,8 @@ import static io.trino.spi.type.TinyintType.TINYINT;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
-public class RediSearchQueryBuilder
+public class RedisAggregationQueryBuilder
 {
-    private static final Logger log = Logger.get(RediSearchQueryBuilder.class);
-
-    private static final Map<String, BiFunction<String, String, Reducer>> CONVERTERS = Map.of(RediSearchAggregation.MAX,
-            (alias, field) -> Max.property(field).as(alias).build(), RediSearchAggregation.MIN,
-            (alias, field) -> Min.property(field).as(alias).build(), RediSearchAggregation.SUM,
-            (alias, field) -> Sum.property(field).as(alias).build(), RediSearchAggregation.AVG,
-            (alias, field) -> Avg.property(field).as(alias).build(), RediSearchAggregation.COUNT,
-            (alias, field) -> Count.as(alias));
-
     public String buildQuery(TupleDomain<ColumnHandle> tupleDomain)
     {
         return buildQuery(tupleDomain, Map.of());
@@ -81,7 +63,7 @@ public class RediSearchQueryBuilder
         Optional<Map<ColumnHandle, Domain>> domains = tupleDomain.getDomains();
         if (domains.isPresent()) {
             for (Map.Entry<ColumnHandle, Domain> entry : domains.get().entrySet()) {
-                RediSearchColumnHandle column = (RediSearchColumnHandle) entry.getKey();
+                RedisAggregationColumnHandle column = (RedisAggregationColumnHandle) entry.getKey();
                 Domain domain = entry.getValue();
                 checkArgument(!domain.isNone(), "Unexpected NONE domain for %s", column.getName());
                 if (!domain.isAll()) {
@@ -90,17 +72,22 @@ public class RediSearchQueryBuilder
             }
         }
         for (Entry<String, String> wildcard : wildcards.entrySet()) {
-            nodes.add(QueryBuilder.intersect(wildcard.getKey(), wildcard.getValue()));
+            nodes.add(QueryBuilders.intersect(wildcard.getKey(), wildcard.getValue()));
         }
         if (nodes.isEmpty()) {
             return "*";
         }
-        return QueryBuilder.intersect(nodes.toArray(new Node[0])).toString();
+        return QueryBuilders.intersect(nodes.toArray(new Node[0])).toString();
     }
 
-    private Optional<Node> buildPredicate(RediSearchColumnHandle column, Domain domain)
+    private static String escapeTag(String value)
     {
-        String columnName = RedisModulesUtils.escapeTag(column.getName());
+        return value.replaceAll("([^a-zA-Z0-9])", "\\\\$1");
+    }
+
+    private Optional<Node> buildPredicate(RedisAggregationColumnHandle column, Domain domain)
+    {
+        String columnName = escapeTag(column.getName());
         checkArgument(domain.getType().isOrderable(), "Domain type must be orderable");
         if (domain.getValues().isNone()) {
             return Optional.empty();
@@ -144,33 +131,33 @@ public class RediSearchQueryBuilder
                 // already have been
                 // checked for
                 if (!rangeConjuncts.isEmpty()) {
-                    disjuncts.add(QueryBuilder.intersect(columnName, rangeConjuncts.toArray(Value[]::new)));
+                    disjuncts.add(QueryBuilders.intersect(columnName, rangeConjuncts.toArray(Value[]::new)));
                 }
             }
         }
         singleValues(column, singleValues).ifPresent(disjuncts::add);
-        return Optional.of(QueryBuilder.union(disjuncts.toArray(Node[]::new)));
+        return Optional.of(QueryBuilders.union(disjuncts.toArray(Node[]::new)));
     }
 
-    private Optional<QueryNode> singleValues(RediSearchColumnHandle column, Set<Object> singleValues)
+    private Optional<QueryNode> singleValues(RedisAggregationColumnHandle column, Set<Object> singleValues)
     {
         if (singleValues.isEmpty()) {
             return Optional.empty();
         }
         if (singleValues.size() == 1) {
             return Optional.of(
-                    QueryBuilder.intersect(column.getName(), value(Iterables.getOnlyElement(singleValues), column)));
+                    QueryBuilders.intersect(column.getName(), value(Iterables.getOnlyElement(singleValues), column)));
         }
-        if (column.getType() instanceof VarcharType && column.getFieldType() == Field.Type.TAG) {
+        if (column.getType() instanceof VarcharType && column.getFieldType() == FieldType.TAG) {
             // Takes care of IN: col IN ('value1', 'value2', ...)
             return Optional
-                    .of(QueryBuilder.intersect(column.getName(), Values.tags(singleValues.toArray(String[]::new))));
+                    .of(QueryBuilders.intersect(column.getName(), Values.tags(singleValues.toArray(String[]::new))));
         }
         Value[] values = singleValues.stream().map(v -> value(v, column)).toArray(Value[]::new);
-        return Optional.of(QueryBuilder.union(column.getName(), values));
+        return Optional.of(QueryBuilders.union(column.getName(), values));
     }
 
-    private Value value(Object trinoNativeValue, RediSearchColumnHandle column)
+    private Value value(Object trinoNativeValue, RedisAggregationColumnHandle column)
     {
         requireNonNull(trinoNativeValue, "trinoNativeValue is null");
         requireNonNull(column, "column is null");
@@ -191,8 +178,8 @@ public class RediSearchQueryBuilder
             return Values.eq((Long) trinoNativeValue);
         }
         if (type instanceof VarcharType) {
-            if (column.getFieldType() == Field.Type.TAG) {
-                return Values.tags(RedisModulesUtils.escapeTag((String) trinoNativeValue));
+            if (column.getFieldType() == FieldType.TAG) {
+                return Values.tags(escapeTag((String) trinoNativeValue));
             }
             return Values.value((String) trinoNativeValue);
         }
@@ -230,27 +217,53 @@ public class RediSearchQueryBuilder
         throw new IllegalArgumentException("Unhandled type: " + type);
     }
 
-    private Reducer reducer(RediSearchAggregation aggregation)
+    public static class GroupBy
     {
-        Optional<RediSearchColumnHandle> column = aggregation.getColumnHandle();
-        String field = column.isPresent() ? column.get().getName() : null;
-        return CONVERTERS.get(aggregation.getFunctionName()).apply(aggregation.getAlias(), field);
+        private List<String> fields = new ArrayList<>();
+        private List<Reducer> reducers = new ArrayList<>();
+
+        public List<String> getFields()
+        {
+            return fields;
+        }
+
+        public void setFields(List<String> fields)
+        {
+            this.fields = fields;
+        }
+
+        public List<Reducer> getReducers()
+        {
+            return reducers;
+        }
+
+        public void setReducers(List<Reducer> reducers)
+        {
+            this.reducers = reducers;
+        }
     }
 
-    public Optional<Group> group(RediSearchTableHandle table)
+    public GroupBy groupBy(RedisAggregationTableHandle table)
     {
-        List<RediSearchAggregationTerm> terms = table.getTermAggregations();
-        List<RediSearchAggregation> aggregates = table.getMetricAggregations();
-        List<String> groupFields = new ArrayList<>();
-        if (terms != null && !terms.isEmpty()) {
-            groupFields = terms.stream().map(RediSearchAggregationTerm::getTerm).collect(Collectors.toList());
+        GroupBy groupBy = new GroupBy();
+        List<RedisAggregation> aggregates = table.getMetricAggregations();
+        if (table.getTermAggregations() != null) {
+            groupBy.setFields(table.getTermAggregations().stream().map(RedisAggregationTerm::getTerm)
+                    .collect(Collectors.toList()));
         }
-        List<Reducer> reducers = aggregates.stream().map(this::reducer).collect(Collectors.toList());
-        if (reducers.isEmpty()) {
-            return Optional.empty();
-        }
-        log.info("Group fields=%s reducers=%s", groupFields, reducers);
-        return Optional
-                .of(Group.by(groupFields.toArray(String[]::new)).reducers(reducers.toArray(Reducer[]::new)).build());
+        groupBy.setReducers(aggregates.stream().map(this::reducer).collect(Collectors.toList()));
+        return groupBy;
+    }
+
+    private Reducer reducer(RedisAggregation aggregation)
+    {
+        Optional<RedisAggregationColumnHandle> column = aggregation.getColumnHandle();
+        String field = column.isPresent() ? column.get().getName() : null;
+        String alias = aggregation.getAlias();
+        Reducer reducer = new Reducer();
+        reducer.setField(field);
+        reducer.setAlias(alias);
+        reducer.setName(aggregation.getFunctionName());
+        return reducer;
     }
 }

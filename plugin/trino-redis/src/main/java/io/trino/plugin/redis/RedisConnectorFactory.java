@@ -24,7 +24,6 @@ import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
 import io.trino.spi.connector.SchemaTableName;
-import io.trino.spi.type.TypeManager;
 
 import java.util.Map;
 import java.util.Optional;
@@ -56,36 +55,27 @@ public class RedisConnectorFactory
         requireNonNull(config, "config is null");
         checkStrictSpiVersionMatch(context, this);
 
-        if (Boolean.parseBoolean(config.getOrDefault("redis.search", "false").trim())) {
-            Bootstrap app = new Bootstrap(
-                    new JsonModule(),
-                    new RediSearchClientModule(),
-                    binder -> binder.bind(TypeManager.class).toInstance(context.getTypeManager()));
-            Injector injector = app.doNotInitializeLogging().setRequiredConfigurationProperties(config).initialize();
-            return injector.getInstance(RediSearchConnector.class);
-        }
-        Bootstrap app = new Bootstrap(
-                new JsonModule(),
-                new TypeDeserializerModule(context.getTypeManager()),
-                new RedisConnectorModule(),
-                binder -> {
+        Bootstrap app = new Bootstrap(new JsonModule(), new TypeDeserializerModule(context.getTypeManager()),
+                new RedisConnectorModule(), binder -> {
                     binder.bind(NodeManager.class).toInstance(context.getNodeManager());
 
                     if (tableDescriptionSupplier.isPresent()) {
-                        binder.bind(new TypeLiteral<Supplier<Map<SchemaTableName, RedisTableDescription>>>() {}).toInstance(tableDescriptionSupplier.get());
+                        binder.bind(new TypeLiteral<Supplier<Map<SchemaTableName, RedisTableDescription>>>()
+                        {
+                        }).toInstance(tableDescriptionSupplier.get());
                     }
                     else {
-                        binder.bind(new TypeLiteral<Supplier<Map<SchemaTableName, RedisTableDescription>>>() {})
-                                .to(RedisTableDescriptionSupplier.class)
-                                .in(Scopes.SINGLETON);
+                        binder.bind(new TypeLiteral<Supplier<Map<SchemaTableName, RedisTableDescription>>>()
+                        {
+                        }).to(RedisTableDescriptionSupplier.class).in(Scopes.SINGLETON);
                     }
                 });
 
-        Injector injector = app
-                .doNotInitializeLogging()
-                .setRequiredConfigurationProperties(config)
-                .initialize();
-
+        Injector injector = app.doNotInitializeLogging().setRequiredConfigurationProperties(config).initialize();
+        boolean search = Boolean.parseBoolean(config.getOrDefault("redis.search", "false"));
+        if (search) {
+            return injector.getInstance(RedisAggregationConnector.class);
+        }
         return injector.getInstance(RedisConnector.class);
     }
 }

@@ -28,27 +28,27 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
-public class RediSearchPageSourceProvider
+public class RedisAggregationPageSourceProvider
         implements ConnectorPageSourceProvider
 {
-    private final RediSearchSession rediSearchSession;
+    private final RedisAggregationSession redisAggregationSession;
 
     @Inject
-    public RediSearchPageSourceProvider(RediSearchSession rediSearchSession)
+    public RedisAggregationPageSourceProvider(RedisAggregationSession redisAggregationSession)
     {
-        this.rediSearchSession = requireNonNull(rediSearchSession, "rediSearchSession is null");
+        this.redisAggregationSession = requireNonNull(redisAggregationSession, "redisAggregationSession is null");
     }
 
     @Override
     public ConnectorPageSource createPageSource(ConnectorTransactionHandle transaction, ConnectorSession session,
             ConnectorSplit split, ConnectorTableHandle table, List<ColumnHandle> columns, DynamicFilter dynamicFilter)
     {
-        RediSearchTableHandle tableHandle = (RediSearchTableHandle) table;
-        ImmutableList.Builder<RediSearchColumnHandle> handles = ImmutableList.builder();
+        RedisAggregationTableHandle tableHandle = (RedisAggregationTableHandle) table;
+        ImmutableList.Builder<RedisAggregationColumnHandle> handles = ImmutableList.builder();
         for (ColumnHandle handle : requireNonNull(columns, "columns is null")) {
-            handles.add((RediSearchColumnHandle) handle);
+            handles.add((RedisAggregationColumnHandle) handle);
         }
-        ImmutableList<RediSearchColumnHandle> columnHandles = handles.build();
-        return new RediSearchPageSource(rediSearchSession, tableHandle, columnHandles);
+        ImmutableList<RedisAggregationColumnHandle> columnHandles = handles.build();
+        return new RedisAggregationPageSource(redisAggregationSession, tableHandle, columnHandles);
     }
 }

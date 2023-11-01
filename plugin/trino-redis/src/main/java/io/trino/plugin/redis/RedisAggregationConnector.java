@@ -14,6 +14,7 @@
 package io.trino.plugin.redis;
 
 import com.google.inject.Inject;
+import io.airlift.bootstrap.LifeCycleManager;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorPageSourceProvider;
@@ -22,28 +23,27 @@ import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.transaction.IsolationLevel;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
-import static com.google.common.base.Preconditions.checkArgument;
-import static io.trino.spi.transaction.IsolationLevel.READ_UNCOMMITTED;
+import static io.trino.spi.transaction.IsolationLevel.READ_COMMITTED;
 import static io.trino.spi.transaction.IsolationLevel.checkConnectorSupports;
 import static java.util.Objects.requireNonNull;
 
-public class RediSearchConnector
+public class RedisAggregationConnector
         implements Connector
 {
-    private final RediSearchSession rediSearchSession;
-    private final RediSearchSplitManager splitManager;
-    private final RediSearchPageSourceProvider pageSourceProvider;
-
-    private final ConcurrentMap<ConnectorTransactionHandle, RediSearchMetadata> transactions = new ConcurrentHashMap<>();
+    private final LifeCycleManager lifeCycleManager;
+    private final RedisAggregationMetadata metadata;
+    private final RedisSplitManager splitManager;
+    private final RedisAggregationPageSourceProvider pageSourceProvider;
 
     @Inject
-    public RediSearchConnector(RediSearchSession rediSearchSession, RediSearchSplitManager splitManager,
-            RediSearchPageSourceProvider pageSourceProvider)
+    public RedisAggregationConnector(
+            LifeCycleManager lifeCycleManager,
+            RedisAggregationMetadata metadata,
+            RedisSplitManager splitManager,
+            RedisAggregationPageSourceProvider pageSourceProvider)
     {
-        this.rediSearchSession = rediSearchSession;
+        this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
+        this.metadata = requireNonNull(metadata, "metadata is null");
         this.splitManager = requireNonNull(splitManager, "splitManager is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
     }
@@ -52,29 +52,14 @@ public class RediSearchConnector
     public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly,
             boolean autoCommit)
     {
-        checkConnectorSupports(READ_UNCOMMITTED, isolationLevel);
-        RediSearchTransactionHandle transaction = new RediSearchTransactionHandle();
-        transactions.put(transaction, new RediSearchMetadata(rediSearchSession));
-        return transaction;
+        checkConnectorSupports(READ_COMMITTED, isolationLevel);
+        return RedisTransactionHandle.INSTANCE;
     }
 
     @Override
     public ConnectorMetadata getMetadata(ConnectorSession session, ConnectorTransactionHandle transactionHandle)
     {
-        RediSearchMetadata metadata = transactions.get(transactionHandle);
-        checkTransaction(metadata, transactionHandle);
         return metadata;
-    }
-
-    private void checkTransaction(Object object, ConnectorTransactionHandle transactionHandle)
-    {
-        checkArgument(object != null, "no such transaction: %s", transactionHandle);
-    }
-
-    @Override
-    public void commit(ConnectorTransactionHandle transaction)
-    {
-        checkTransaction(transactions.remove(transaction), transaction);
     }
 
     @Override
@@ -92,6 +77,6 @@ public class RediSearchConnector
     @Override
     public void shutdown()
     {
-        rediSearchSession.shutdown();
+        lifeCycleManager.stop();
     }
 }

@@ -33,7 +33,7 @@ import static io.trino.spi.type.RealType.REAL;
 import static io.trino.spi.type.SmallintType.SMALLINT;
 import static io.trino.spi.type.TinyintType.TINYINT;
 
-public class RediSearchAggregation
+public class RedisAggregation
 {
     public static final String MAX = "max";
 
@@ -53,14 +53,14 @@ public class RediSearchAggregation
 
     private final Type outputType;
 
-    private final Optional<RediSearchColumnHandle> columnHandle;
+    private final Optional<RedisAggregationColumnHandle> columnHandle;
 
     private final String alias;
 
     @JsonCreator
-    public RediSearchAggregation(@JsonProperty("functionName") String functionName,
+    public RedisAggregation(@JsonProperty("functionName") String functionName,
             @JsonProperty("outputType") Type outputType,
-            @JsonProperty("columnHandle") Optional<RediSearchColumnHandle> columnHandle,
+            @JsonProperty("columnHandle") Optional<RedisAggregationColumnHandle> columnHandle,
             @JsonProperty("alias") String alias)
     {
         this.functionName = functionName;
@@ -82,7 +82,7 @@ public class RediSearchAggregation
     }
 
     @JsonProperty
-    public Optional<RediSearchColumnHandle> getColumnHandle()
+    public Optional<RedisAggregationColumnHandle> getColumnHandle()
     {
         return columnHandle;
     }
@@ -98,22 +98,22 @@ public class RediSearchAggregation
         return NUMERIC_TYPES.contains(type);
     }
 
-    public static Optional<RediSearchAggregation> handleAggregation(AggregateFunction function,
+    public static Optional<RedisAggregation> handleAggregation(AggregateFunction function,
             Map<String, ColumnHandle> assignments, String alias)
     {
         if (!SUPPORTED_AGGREGATION_FUNCTIONS.contains(function.getFunctionName())) {
             return Optional.empty();
         }
-        Optional<RediSearchColumnHandle> parameterColumnHandle = function.getArguments().stream()
+        Optional<RedisAggregationColumnHandle> parameterColumnHandle = function.getArguments().stream()
                 .filter(Variable.class::isInstance).map(Variable.class::cast).map(Variable::getName)
                 .filter(assignments::containsKey).findFirst().map(assignments::get)
-                .map(RediSearchColumnHandle.class::cast)
-                .filter(column -> RediSearchAggregation.isNumericType(column.getType()));
+                .map(RedisAggregationColumnHandle.class::cast)
+                .filter(column -> RedisAggregation.isNumericType(column.getType()));
         // only count can accept empty RediSearchColumnHandle
         if (parameterColumnHandle.isEmpty() && !COUNT.equals(function.getFunctionName())) {
             return Optional.empty();
         }
-        return Optional.of(new RediSearchAggregation(function.getFunctionName(), function.getOutputType(),
+        return Optional.of(new RedisAggregation(function.getFunctionName(), function.getOutputType(),
                 parameterColumnHandle, alias));
     }
 
@@ -126,7 +126,7 @@ public class RediSearchAggregation
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        RediSearchAggregation that = (RediSearchAggregation) o;
+        RedisAggregation that = (RedisAggregation) o;
         return Objects.equals(functionName, that.functionName) && Objects.equals(outputType, that.outputType)
                 && Objects.equals(columnHandle, that.columnHandle) && Objects.equals(alias, that.alias);
     }
@@ -140,6 +140,6 @@ public class RediSearchAggregation
     @Override
     public String toString()
     {
-        return String.format("%s(%s)", functionName, columnHandle.map(RediSearchColumnHandle::getName).orElse(""));
+        return String.format("%s(%s)", functionName, columnHandle.map(RedisAggregationColumnHandle::getName).orElse(""));
     }
 }

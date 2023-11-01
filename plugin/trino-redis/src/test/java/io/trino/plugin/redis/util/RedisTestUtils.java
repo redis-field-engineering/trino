@@ -18,7 +18,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import io.airlift.json.JsonCodec;
 import io.trino.metadata.QualifiedObjectName;
-import io.trino.plugin.redis.RedisPlugin;
 import io.trino.plugin.redis.RedisTableDescription;
 import io.trino.plugin.redis.TestingRedisPlugin;
 import io.trino.spi.connector.SchemaTableName;
@@ -52,28 +51,9 @@ public final class RedisTestUtils
         queryRunner.createCatalog("redis", "redis", connectorProperties);
     }
 
-    public static void installRedisPlugin(RedisSearchServer redisSearchServer, QueryRunner queryRunner, Map<String, String> connectorProperties)
-    {
-        queryRunner.installPlugin(new RedisPlugin());
-
-        // note: additional copy via ImmutableList so that if fails on nulls
-        connectorProperties = new HashMap<>(ImmutableMap.copyOf(connectorProperties));
-        connectorProperties.putIfAbsent("redis.nodes", redisSearchServer.getHostAndPort().toString());
-        connectorProperties.putIfAbsent("redis.default-schema", "default");
-        connectorProperties.putIfAbsent("redis.search", "true");
-
-        queryRunner.createCatalog("redis", "redis", connectorProperties);
-    }
-
     public static void loadTpchTable(RedisServer redisServer, TestingTrinoClient trinoClient, String tableName, QualifiedObjectName tpchTableName, String dataFormat)
     {
         RedisLoader tpchLoader = new RedisLoader(trinoClient.getServer(), trinoClient.getDefaultSession(), redisServer.getJedisPool(), tableName, dataFormat);
-        tpchLoader.execute(format("SELECT * from %s", tpchTableName));
-    }
-
-    public static void loadTpchTable(RedisSearchServer redisServer, TestingTrinoClient trinoClient, String tableName, QualifiedObjectName tpchTableName)
-    {
-        RedisSearchLoader tpchLoader = new RedisSearchLoader(trinoClient.getServer(), trinoClient.getDefaultSession(), redisServer.getClient(), tableName);
         tpchLoader.execute(format("SELECT * from %s", tpchTableName));
     }
 

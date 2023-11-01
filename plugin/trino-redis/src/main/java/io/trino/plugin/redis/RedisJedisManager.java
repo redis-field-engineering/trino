@@ -18,8 +18,9 @@ import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.trino.spi.HostAddress;
 import jakarta.annotation.PreDestroy;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import redis.clients.jedis.Connection;
+import redis.clients.jedis.JedisPooled;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,7 +36,7 @@ public class RedisJedisManager
 {
     private static final Logger log = Logger.get(RedisJedisManager.class);
 
-    private final ConcurrentMap<HostAddress, JedisPool> jedisPoolCache = new ConcurrentHashMap<>();
+    private final ConcurrentMap<HostAddress, JedisPooled> jedisPoolCache = new ConcurrentHashMap<>();
 
     private final String redisUser;
     private final String redisPassword;
@@ -45,7 +46,7 @@ public class RedisJedisManager
     private final char redisKeyDelimiter;
     private final boolean keyPrefixSchemaTable;
     private final int redisScanCount;
-    private final JedisPoolConfig jedisPoolConfig;
+    private final GenericObjectPoolConfig<Connection> jedisPoolConfig;
 
     @Inject
     RedisJedisManager(RedisConnectorConfig redisConnectorConfig)
@@ -59,15 +60,15 @@ public class RedisJedisManager
         this.redisKeyDelimiter = redisConnectorConfig.getRedisKeyDelimiter();
         this.keyPrefixSchemaTable = redisConnectorConfig.isKeyPrefixSchemaTable();
         this.redisScanCount = redisConnectorConfig.getRedisScanCount();
-        this.jedisPoolConfig = new JedisPoolConfig();
+        this.jedisPoolConfig = new GenericObjectPoolConfig<>();
     }
 
     @PreDestroy
     public void tearDown()
     {
-        for (Map.Entry<HostAddress, JedisPool> entry : jedisPoolCache.entrySet()) {
+        for (Map.Entry<HostAddress, JedisPooled> entry : jedisPoolCache.entrySet()) {
             try {
-                entry.getValue().destroy();
+                entry.getValue().close();
             }
             catch (Exception e) {
                 log.warn(e, "While destroying JedisPool %s:", entry.getKey());
@@ -95,16 +96,16 @@ public class RedisJedisManager
         return redisScanCount;
     }
 
-    public JedisPool getJedisPool(HostAddress host)
+    public JedisPooled getJedisPool(HostAddress host)
     {
         requireNonNull(host, "host is null");
         return jedisPoolCache.computeIfAbsent(host, this::createConsumer);
     }
 
-    private JedisPool createConsumer(HostAddress host)
+    private JedisPooled createConsumer(HostAddress host)
     {
         log.info("Creating new JedisPool for %s", host);
-        return new JedisPool(jedisPoolConfig,
+        return new JedisPooled(jedisPoolConfig,
                 host.getHostText(),
                 host.getPort(),
                 toIntExact(redisConnectTimeout.toMillis()),

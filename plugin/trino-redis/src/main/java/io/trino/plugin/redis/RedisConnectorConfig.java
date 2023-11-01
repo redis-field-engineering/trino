@@ -53,9 +53,8 @@ public class RedisConnectorConfig
     private boolean hideInternalColumns = true;
     private boolean keyPrefixSchemaTable;
     private boolean search;
-    private boolean insecure;
-    private long defaultSearchLimit = 10000;
-    private long searchCursorCount = 1000;
+    private int defaultSearchLimit = 10000;
+    private int searchCursorCount = 1000;
     private boolean caseInsensitiveNames;
 
     @NotNull
@@ -263,41 +262,28 @@ public class RedisConnectorConfig
         return this;
     }
 
-    public boolean isInsecure()
-    {
-        return insecure;
-    }
-
-    @Config("redis.insecure")
-    @ConfigDescription("Allow insecure connections (e.g. invalid certificates) to Redis when using search and SSL")
-    public RedisConnectorConfig setInsecure(boolean insecure)
-    {
-        this.insecure = insecure;
-        return this;
-    }
-
-    public long getDefaultSearchLimit()
+    public int getDefaultSearchLimit()
     {
         return defaultSearchLimit;
     }
 
     @Config("redis.default-search-limit")
     @ConfigDescription("Default search limit number to use")
-    public RedisConnectorConfig setDefaultSearchLimit(long limit)
+    public RedisConnectorConfig setDefaultSearchLimit(int limit)
     {
         this.defaultSearchLimit = limit;
         return this;
     }
 
     @Min(0)
-    public long getSearchCursorCount()
+    public int getSearchCursorCount()
     {
         return searchCursorCount;
     }
 
     @Config("redis.search-cursor-count")
     @ConfigDescription("Search cursor read size")
-    public RedisConnectorConfig setSearchCursorCount(long count)
+    public RedisConnectorConfig setSearchCursorCount(int count)
     {
         this.searchCursorCount = count;
         return this;

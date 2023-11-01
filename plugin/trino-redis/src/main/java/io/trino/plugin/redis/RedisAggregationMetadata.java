@@ -15,32 +15,24 @@ package io.trino.plugin.redis;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.redis.lettucemod.search.Field;
-import com.redis.lettucemod.search.querybuilder.Values;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.trino.plugin.base.expression.ConnectorExpressions;
-import io.trino.spi.StandardErrorCode;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.AggregateFunction;
 import io.trino.spi.connector.AggregationApplicationResult;
 import io.trino.spi.connector.Assignment;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
-import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
-import io.trino.spi.connector.ConnectorOutputMetadata;
-import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
-import io.trino.spi.connector.ConnectorTableLayout;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
 import io.trino.spi.connector.Constraint;
 import io.trino.spi.connector.ConstraintApplicationResult;
 import io.trino.spi.connector.LimitApplicationResult;
 import io.trino.spi.connector.NotFoundException;
-import io.trino.spi.connector.RetryMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SchemaTablePrefix;
 import io.trino.spi.connector.TableNotFoundException;
@@ -50,44 +42,44 @@ import io.trino.spi.expression.Constant;
 import io.trino.spi.expression.Variable;
 import io.trino.spi.predicate.Domain;
 import io.trino.spi.predicate.TupleDomain;
-import io.trino.spi.statistics.ComputedStatistics;
+import redis.clients.jedis.search.Schema.FieldType;
+import redis.clients.jedis.search.querybuilder.Values;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalLong;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.base.Verify.verifyNotNull;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.airlift.slice.SliceUtf8.getCodePointAt;
 import static io.trino.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.trino.spi.expression.StandardFunctions.LIKE_FUNCTION_NAME;
+import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
-public class RediSearchMetadata
+public class RedisAggregationMetadata
         implements ConnectorMetadata
 {
-    private static final Logger log = Logger.get(RediSearchMetadata.class);
+    private static final Logger log = Logger.get(RedisAggregationMetadata.class);
 
     private static final String SYNTHETIC_COLUMN_NAME_PREFIX = "syntheticColumn";
     private static final Set<Integer> REDISEARCH_RESERVED_CHARACTERS = IntStream
             .of('?', '*', '|', '{', '}', '[', ']', '(', ')', '"', '#', '@', '&', '<', '>', '~').boxed()
             .collect(toImmutableSet());
 
-    private final RediSearchSession rediSearchSession;
+    private final RedisAggregationSession rediSearchSession;
     private final String schemaName;
     private final AtomicReference<Runnable> rollbackAction = new AtomicReference<>();
 
-    public RediSearchMetadata(RediSearchSession rediSearchSession)
+    public RedisAggregationMetadata(RedisAggregationSession rediSearchSession)
     {
         this.rediSearchSession = requireNonNull(rediSearchSession, "rediSearchSession is null");
         this.schemaName = rediSearchSession.getConfig().getDefaultSchema();
@@ -100,7 +92,7 @@ public class RediSearchMetadata
     }
 
     @Override
-    public RediSearchTableHandle getTableHandle(ConnectorSession session, SchemaTableName tableName)
+    public RedisAggregationTableHandle getTableHandle(ConnectorSession session, SchemaTableName tableName)
     {
         requireNonNull(tableName, "tableName is null");
 
@@ -136,11 +128,11 @@ public class RediSearchMetadata
     @Override
     public Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        RediSearchTableHandle table = (RediSearchTableHandle) tableHandle;
-        List<RediSearchColumnHandle> columns = rediSearchSession.getTable(table.getSchemaTableName()).getColumns();
+        RedisAggregationTableHandle table = (RedisAggregationTableHandle) tableHandle;
+        List<RedisAggregationColumnHandle> columns = rediSearchSession.getTable(table.getSchemaTableName()).getColumns();
 
         ImmutableMap.Builder<String, ColumnHandle> columnHandles = ImmutableMap.builder();
-        for (RediSearchColumnHandle columnHandle : columns) {
+        for (RedisAggregationColumnHandle columnHandle : columns) {
             columnHandles.put(columnHandle.getName(), columnHandle);
         }
         return columnHandles.buildOrThrow();
@@ -175,7 +167,7 @@ public class RediSearchMetadata
     public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle,
             ColumnHandle columnHandle)
     {
-        return ((RediSearchColumnHandle) columnHandle).toColumnMetadata();
+        return ((RedisAggregationColumnHandle) columnHandle).toColumnMetadata();
     }
 
     @Override
@@ -187,78 +179,27 @@ public class RediSearchMetadata
     @Override
     public void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        RediSearchTableHandle table = (RediSearchTableHandle) tableHandle;
+        RedisAggregationTableHandle table = (RedisAggregationTableHandle) tableHandle;
         rediSearchSession.dropTable(table.getSchemaTableName());
     }
 
     @Override
     public void addColumn(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column)
     {
-        rediSearchSession.addColumn(((RediSearchTableHandle) tableHandle).getSchemaTableName(), column);
+        rediSearchSession.addColumn(((RedisAggregationTableHandle) tableHandle).getSchemaTableName(), column);
     }
 
     @Override
     public void dropColumn(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column)
     {
-        rediSearchSession.dropColumn(((RediSearchTableHandle) tableHandle).getSchemaTableName(),
-                ((RediSearchColumnHandle) column).getName());
-    }
-
-    @Override
-    public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata,
-            Optional<ConnectorTableLayout> layout, RetryMode retryMode)
-    {
-        checkRetry(retryMode);
-        List<RediSearchColumnHandle> columns = buildColumnHandles(tableMetadata);
-
-        rediSearchSession.createTable(tableMetadata.getTable(), columns);
-
-        setRollback(() -> rediSearchSession.dropTable(tableMetadata.getTable()));
-
-        return new RediSearchOutputTableHandle(tableMetadata.getTable(),
-                columns.stream().filter(c -> !c.isHidden()).collect(Collectors.toList()));
-    }
-
-    private void checkRetry(RetryMode retryMode)
-    {
-        if (retryMode != RetryMode.NO_RETRIES) {
-            throw new TrinoException(StandardErrorCode.NOT_SUPPORTED, "This connector does not support retries");
-        }
-    }
-
-    @Override
-    public Optional<ConnectorOutputMetadata> finishCreateTable(ConnectorSession session,
-            ConnectorOutputTableHandle tableHandle, Collection<Slice> fragments,
-            Collection<ComputedStatistics> computedStatistics)
-    {
-        clearRollback();
-        return Optional.empty();
-    }
-
-    @Override
-    public ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle,
-            List<ColumnHandle> insertedColumns, RetryMode retryMode)
-    {
-        checkRetry(retryMode);
-        RediSearchTableHandle table = (RediSearchTableHandle) tableHandle;
-        List<RediSearchColumnHandle> columns = rediSearchSession.getTable(table.getSchemaTableName()).getColumns();
-
-        return new RediSearchInsertTableHandle(table.getSchemaTableName(),
-                columns.stream().filter(column -> !column.isHidden()).collect(Collectors.toList()));
-    }
-
-    @Override
-    public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session,
-            ConnectorInsertTableHandle insertHandle, Collection<Slice> fragments,
-            Collection<ComputedStatistics> computedStatistics)
-    {
-        return Optional.empty();
+        rediSearchSession.dropColumn(((RedisAggregationTableHandle) tableHandle).getSchemaTableName(),
+                ((RedisAggregationColumnHandle) column).getName());
     }
 
     @Override
     public ConnectorTableProperties getTableProperties(ConnectorSession session, ConnectorTableHandle table)
     {
-        RediSearchTableHandle handle = (RediSearchTableHandle) table;
+        RedisAggregationTableHandle handle = (RedisAggregationTableHandle) table;
         return new ConnectorTableProperties(handle.getConstraint(), Optional.empty(), Optional.empty(), List.of());
     }
 
@@ -266,18 +207,18 @@ public class RediSearchMetadata
     public Optional<LimitApplicationResult<ConnectorTableHandle>> applyLimit(ConnectorSession session,
             ConnectorTableHandle table, long limit)
     {
-        RediSearchTableHandle handle = (RediSearchTableHandle) table;
+        RedisAggregationTableHandle handle = (RedisAggregationTableHandle) table;
 
         if (limit == 0) {
             return Optional.empty();
         }
 
-        if (handle.getLimit().isPresent() && handle.getLimit().getAsLong() <= limit) {
+        if (handle.getLimit().isPresent() && handle.getLimit().getAsInt() <= limit) {
             return Optional.empty();
         }
 
-        return Optional.of(new LimitApplicationResult<>(new RediSearchTableHandle(handle.getSchemaTableName(),
-                handle.getIndex(), handle.getConstraint(), OptionalLong.of(limit), handle.getTermAggregations(),
+        return Optional.of(new LimitApplicationResult<>(new RedisAggregationTableHandle(handle.getSchemaTableName(),
+                handle.getIndex(), handle.getConstraint(), OptionalInt.of(toIntExact(limit)), handle.getTermAggregations(),
                 handle.getMetricAggregations(), handle.getWildcards(), handle.getUpdatedColumns()), true, false));
     }
 
@@ -285,7 +226,7 @@ public class RediSearchMetadata
     public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session,
             ConnectorTableHandle table, Constraint constraint)
     {
-        RediSearchTableHandle handle = (RediSearchTableHandle) table;
+        RedisAggregationTableHandle handle = (RedisAggregationTableHandle) table;
 
         ConnectorExpression oldExpression = constraint.getExpression();
         Map<String, String> newWildcards = new HashMap<>(handle.getWildcards());
@@ -297,7 +238,7 @@ public class RediSearchMetadata
                 if (isSupportedLikeCall(call)) {
                     List<ConnectorExpression> arguments = call.getArguments();
                     String variableName = ((Variable) arguments.get(0)).getName();
-                    RediSearchColumnHandle column = (RediSearchColumnHandle) constraint.getAssignments()
+                    RedisAggregationColumnHandle column = (RedisAggregationColumnHandle) constraint.getAssignments()
                             .get(variableName);
                     verifyNotNull(column, "No assignment for %s", variableName);
                     String columnName = column.getName();
@@ -309,7 +250,7 @@ public class RediSearchMetadata
 
                     if (!newWildcards.containsKey(columnName) && pattern instanceof Slice) {
                         String wildcard = likeToWildcard((Slice) pattern, escape);
-                        if (column.getFieldType() == Field.Type.TAG) {
+                        if (column.getFieldType() == FieldType.TAG) {
                             wildcard = Values.tags(wildcard).toString();
                         }
                         newWildcards.put(columnName, wildcard);
@@ -325,7 +266,7 @@ public class RediSearchMetadata
         Map<ColumnHandle, Domain> domains = constraint.getSummary().getDomains()
                 .orElseThrow(() -> new IllegalArgumentException("constraint summary is NONE"));
         for (Map.Entry<ColumnHandle, Domain> entry : domains.entrySet()) {
-            RediSearchColumnHandle column = (RediSearchColumnHandle) entry.getKey();
+            RedisAggregationColumnHandle column = (RedisAggregationColumnHandle) entry.getKey();
 
             if (column.isSupportsPredicates() && !newWildcards.containsKey(column.getName())) {
                 supported.put(column, entry.getValue());
@@ -342,7 +283,7 @@ public class RediSearchMetadata
             return Optional.empty();
         }
 
-        handle = new RediSearchTableHandle(handle.getSchemaTableName(), handle.getIndex(), newDomain, handle.getLimit(),
+        handle = new RedisAggregationTableHandle(handle.getSchemaTableName(), handle.getIndex(), newDomain, handle.getLimit(),
                 handle.getTermAggregations(), handle.getMetricAggregations(), newWildcards, handle.getUpdatedColumns());
 
         return Optional.of(new ConstraintApplicationResult<>(handle, TupleDomain.withColumnDomains(unsupported),
@@ -382,7 +323,7 @@ public class RediSearchMetadata
 
     protected static String likeToWildcard(Slice pattern, Optional<Slice> escape)
     {
-        Optional<Character> escapeChar = escape.map(RediSearchMetadata::getEscapeChar);
+        Optional<Character> escapeChar = escape.map(RedisAggregationMetadata::getEscapeChar);
         StringBuilder wildcard = new StringBuilder();
         boolean escaped = false;
         int position = 0;
@@ -436,7 +377,7 @@ public class RediSearchMetadata
             List<List<ColumnHandle>> groupingSets)
     {
         log.info("applyAggregation aggregates=%s groupingSets=%s", aggregates, groupingSets);
-        RediSearchTableHandle table = (RediSearchTableHandle) handle;
+        RedisAggregationTableHandle table = (RedisAggregationTableHandle) handle;
         // Global aggregation is represented by [[]]
         verify(!groupingSets.isEmpty(), "No grouping sets provided");
         if (!table.getTermAggregations().isEmpty()) {
@@ -444,50 +385,40 @@ public class RediSearchMetadata
         }
         ImmutableList.Builder<ConnectorExpression> projections = ImmutableList.builder();
         ImmutableList.Builder<Assignment> resultAssignments = ImmutableList.builder();
-        ImmutableList.Builder<RediSearchAggregation> aggregations = ImmutableList.builder();
-        ImmutableList.Builder<RediSearchAggregationTerm> terms = ImmutableList.builder();
+        ImmutableList.Builder<RedisAggregation> aggregations = ImmutableList.builder();
+        ImmutableList.Builder<RedisAggregationTerm> terms = ImmutableList.builder();
         for (int i = 0; i < aggregates.size(); i++) {
             AggregateFunction function = aggregates.get(i);
             String colName = SYNTHETIC_COLUMN_NAME_PREFIX + i;
-            Optional<RediSearchAggregation> aggregation = RediSearchAggregation.handleAggregation(function, assignments,
+            Optional<RedisAggregation> aggregation = RedisAggregation.handleAggregation(function, assignments,
                     colName);
             if (aggregation.isEmpty()) {
                 return Optional.empty();
             }
             io.trino.spi.type.Type outputType = function.getOutputType();
-            RediSearchColumnHandle newColumn = new RediSearchColumnHandle(colName, outputType,
-                    RediSearchSession.toFieldType(outputType), false, true);
+            RedisAggregationColumnHandle newColumn = new RedisAggregationColumnHandle(colName, outputType,
+                    RedisAggregationSession.toFieldType(outputType), false, true);
             projections.add(new Variable(colName, function.getOutputType()));
             resultAssignments.add(new Assignment(colName, newColumn, function.getOutputType()));
             aggregations.add(aggregation.get());
         }
         for (ColumnHandle columnHandle : groupingSets.get(0)) {
-            Optional<RediSearchAggregationTerm> termAggregation = RediSearchAggregationTerm
+            Optional<RedisAggregationTerm> termAggregation = RedisAggregationTerm
                     .fromColumnHandle(columnHandle);
             if (termAggregation.isEmpty()) {
                 return Optional.empty();
             }
             terms.add(termAggregation.get());
         }
-        ImmutableList<RediSearchAggregation> aggregationList = aggregations.build();
+        ImmutableList<RedisAggregation> aggregationList = aggregations.build();
         if (aggregationList.isEmpty()) {
             return Optional.empty();
         }
-        RediSearchTableHandle tableHandle = new RediSearchTableHandle(table.getSchemaTableName(), table.getIndex(),
+        RedisAggregationTableHandle tableHandle = new RedisAggregationTableHandle(table.getSchemaTableName(), table.getIndex(),
                 table.getConstraint(), table.getLimit(), terms.build(), aggregationList, table.getWildcards(),
                 table.getUpdatedColumns());
         return Optional.of(new AggregationApplicationResult<>(tableHandle, projections.build(),
                 resultAssignments.build(), Map.of(), false));
-    }
-
-    private void setRollback(Runnable action)
-    {
-        checkState(rollbackAction.compareAndSet(null, action), "rollback action is already set");
-    }
-
-    private void clearRollback()
-    {
-        rollbackAction.set(null);
     }
 
     public void rollback()
@@ -497,23 +428,23 @@ public class RediSearchMetadata
 
     private SchemaTableName getTableName(ConnectorTableHandle tableHandle)
     {
-        return ((RediSearchTableHandle) tableHandle).getSchemaTableName();
+        return ((RedisAggregationTableHandle) tableHandle).getSchemaTableName();
     }
 
     private ConnectorTableMetadata getTableMetadata(ConnectorSession session, SchemaTableName tableName)
     {
-        RediSearchTableHandle tableHandle = rediSearchSession.getTable(tableName).getTableHandle();
+        RedisAggregationTableHandle tableHandle = rediSearchSession.getTable(tableName).getTableHandle();
 
         List<ColumnMetadata> columns = ImmutableList
-                .copyOf(getColumnHandles(session, tableHandle).values().stream().map(RediSearchColumnHandle.class::cast)
-                        .map(RediSearchColumnHandle::toColumnMetadata).collect(Collectors.toList()));
+                .copyOf(getColumnHandles(session, tableHandle).values().stream().map(RedisAggregationColumnHandle.class::cast)
+                        .map(RedisAggregationColumnHandle::toColumnMetadata).collect(Collectors.toList()));
 
         return new ConnectorTableMetadata(tableName, columns);
     }
 
-    private List<RediSearchColumnHandle> buildColumnHandles(ConnectorTableMetadata tableMetadata)
+    private List<RedisAggregationColumnHandle> buildColumnHandles(ConnectorTableMetadata tableMetadata)
     {
-        return tableMetadata.getColumns().stream().map(m -> new RediSearchColumnHandle(m.getName(), m.getType(),
-                RediSearchSession.toFieldType(m.getType()), m.isHidden(), true)).collect(Collectors.toList());
+        return tableMetadata.getColumns().stream().map(m -> new RedisAggregationColumnHandle(m.getName(), m.getType(),
+                RedisAggregationSession.toFieldType(m.getType()), m.isHidden(), true)).collect(Collectors.toList());
     }
 }

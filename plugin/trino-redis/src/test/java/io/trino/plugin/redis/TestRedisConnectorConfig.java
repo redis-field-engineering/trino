@@ -49,7 +49,6 @@ public class TestRedisConnectorConfig
                 .setSearch(false)
                 .setCaseInsensitiveNames(false)
                 .setDefaultSearchLimit(10000)
-                .setInsecure(false)
                 .setSearchCursorCount(1000));
     }
 
@@ -96,8 +95,7 @@ public class TestRedisConnectorConfig
                 .setSearch(true)
                 .setCaseInsensitiveNames(true)
                 .setSearchCursorCount(100)
-                .setDefaultSearchLimit(100)
-                .setInsecure(true);
+                .setDefaultSearchLimit(100);
 
         assertFullMapping(properties, expected);
     }

@@ -12,6 +12,7 @@
  * limitations under the License.
  */
 package io.trino.plugin.redis;
+
 import com.google.common.primitives.SignedBytes;
 import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
@@ -44,7 +45,7 @@ import static io.trino.spi.type.Timestamps.MICROSECONDS_PER_MILLISECOND;
 import static io.trino.spi.type.TinyintType.TINYINT;
 import static java.lang.Float.floatToIntBits;
 
-public class RediSearchPageSourceResultWriter
+public class RedisAggregationPageSourceResultWriter
 {
     public void appendTo(Type type, String value, BlockBuilder output)
     {
