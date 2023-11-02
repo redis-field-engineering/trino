@@ -5,7 +5,7 @@
     <parent>
         <groupId>io.trino</groupId>
         <artifactId>trino-root</artifactId>
-        <version>431-SNAPSHOT</version>
+        <version>432-SNAPSHOT</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
@@ -69,6 +69,11 @@
         <dependency>
             <groupId>dev.failsafe</groupId>
             <artifactId>failsafe</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>aircompressor</artifactId>
         </dependency>
 
         <dependency>
@@ -179,11 +184,6 @@
         <dependency>
             <groupId>io.trino.coral</groupId>
             <artifactId>coral</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>io.trino.hadoop</groupId>
-            <artifactId>hadoop-apache</artifactId>
         </dependency>
 
         <dependency>
@@ -300,8 +300,8 @@
         </dependency>
 
         <dependency>
-            <groupId>io.trino</groupId>
-            <artifactId>trino-hadoop-toolkit</artifactId>
+            <groupId>io.trino.hadoop</groupId>
+            <artifactId>hadoop-apache</artifactId>
             <scope>runtime</scope>
         </dependency>
 
@@ -538,6 +538,7 @@
                             <excludes>
                                 <exclude>**/TestHiveGlueMetastore.java</exclude>
                                 <exclude>**/TestHiveS3AndGlueMetastoreTest.java</exclude>
+                                <exclude>**/TestHiveConcurrentModificationGlueMetastore.java</exclude>
                                 <exclude>**/TestTrinoS3FileSystemAwsS3.java</exclude>
                                 <exclude>**/TestFullParquetReader.java</exclude>
                                 <exclude>**/TestParquetReader.java</exclude>
@@ -595,6 +596,7 @@
                             <includes>
                                 <include>**/TestHiveGlueMetastore.java</include>
                                 <include>**/TestHiveS3AndGlueMetastoreTest.java</include>
+                                <include>**/TestHiveConcurrentModificationGlueMetastore.java</include>
                                 <include>**/TestTrinoS3FileSystemAwsS3.java</include>
                             </includes>
                         </configuration>
