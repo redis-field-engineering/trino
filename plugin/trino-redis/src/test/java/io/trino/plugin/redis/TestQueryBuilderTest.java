@@ -19,7 +19,8 @@ import io.trino.spi.predicate.Domain;
 import io.trino.spi.predicate.TupleDomain;
 import io.trino.spi.predicate.ValueSet;
 import io.trino.spi.type.DoubleType;
-import org.testng.annotations.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import redis.clients.jedis.search.Schema.FieldType;
 
 import static io.airlift.slice.Slices.utf8Slice;
@@ -29,14 +30,16 @@ import static io.trino.spi.predicate.Range.lessThan;
 import static io.trino.spi.predicate.Range.range;
 import static io.trino.spi.type.BigintType.BIGINT;
 import static io.trino.spi.type.VarcharType.createUnboundedVarcharType;
+import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
 import static org.testng.Assert.assertEquals;
 
-public class TestQueryBuilder
+@TestInstance(PER_CLASS)
+public class TestQueryBuilderTest
 {
-    private static final RedisAggregationColumnHandle COL1 = new RedisAggregationColumnHandle("col1", BIGINT, FieldType.NUMERIC,
-            false, true);
-    private static final RedisAggregationColumnHandle COL2 = new RedisAggregationColumnHandle("col2", createUnboundedVarcharType(),
-            FieldType.TAG, false, true);
+    private static final RedisAggregationColumnHandle COL1 = new RedisAggregationColumnHandle("col1", BIGINT,
+            FieldType.NUMERIC, false, true);
+    private static final RedisAggregationColumnHandle COL2 = new RedisAggregationColumnHandle("col2",
+            createUnboundedVarcharType(), FieldType.TAG, false, true);
 
     @Test
     public void testBuildQuery()
@@ -86,8 +89,8 @@ public class TestQueryBuilder
     @Test
     public void testBuildQueryInDouble()
     {
-        RedisAggregationColumnHandle orderkey = new RedisAggregationColumnHandle("orderkey", DoubleType.DOUBLE, FieldType.NUMERIC,
-                false, true);
+        RedisAggregationColumnHandle orderkey = new RedisAggregationColumnHandle("orderkey", DoubleType.DOUBLE,
+                FieldType.NUMERIC, false, true);
         ValueSet values = ValueSet.ofRanges(equal(DoubleType.DOUBLE, 1.0), equal(DoubleType.DOUBLE, 2.0),
                 equal(DoubleType.DOUBLE, 3.0));
         TupleDomain<ColumnHandle> tupleDomain = TupleDomain
